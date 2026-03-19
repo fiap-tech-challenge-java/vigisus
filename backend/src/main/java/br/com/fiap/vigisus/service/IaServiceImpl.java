@@ -3,8 +3,6 @@ package br.com.fiap.vigisus.service;
 import br.com.fiap.vigisus.dto.IntencaoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
-
-import java.util.List;
 import br.com.fiap.vigisus.dto.openai.OpenAiRequest;
 import br.com.fiap.vigisus.dto.openai.OpenAiRequest.OpenAiMessage;
 import br.com.fiap.vigisus.dto.openai.OpenAiResponse;
@@ -86,6 +84,18 @@ public class IaServiceImpl implements IaService {
                 previsao.getFatores());
 
         return chamarIa(systemPrompt, userPrompt);
+    }
+
+    @Override
+    public String gerarTextoOperacional(String contexto) {
+        String systemPrompt = "Você é um médico coordenador de urgência do SUS.\n" +
+                "Escreva um briefing operacional DIRETO (máximo 5 linhas)\n" +
+                "para o gestor da unidade de saúde.\n" +
+                "Inclua: situação atual, tendência, ação recomendada.\n" +
+                "NÃO use jargões. Seja objetivo como se fosse uma mensagem\n" +
+                "de WhatsApp para o chefe de plantão.";
+
+        return chamarIa(systemPrompt, contexto);
     }
 
     @Override

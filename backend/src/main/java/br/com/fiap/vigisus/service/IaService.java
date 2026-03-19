@@ -15,4 +15,6 @@ public interface IaService {
     IntencaoDTO interpretarPergunta(String pergunta);
 
     String gerarTextoTriagem(String prioridade, List<String> sintomas, String alertaEpidemiologico);
+
+    String gerarTextoOperacional(String contexto);
 }

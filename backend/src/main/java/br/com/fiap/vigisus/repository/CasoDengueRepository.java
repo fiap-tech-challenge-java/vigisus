@@ -22,4 +22,11 @@ public interface CasoDengueRepository extends JpaRepository<CasoDengue, Long> {
             "GROUP BY c.coMunicipio")
     List<Object[]> sumTotalCasosByCoMunicipioInAndAno(@Param("cosMunicipios") Collection<String> cosMunicipios,
                                                        @Param("ano") int ano);
+
+    @Query("SELECT c.semanaEpi, COALESCE(SUM(c.totalCasos), 0) FROM CasoDengue c " +
+            "WHERE c.coMunicipio = :coMunicipio AND c.ano = :ano AND c.semanaEpi IN :semanas " +
+            "GROUP BY c.semanaEpi ORDER BY c.semanaEpi")
+    List<Object[]> findCasosPorSemanas(@Param("coMunicipio") String coMunicipio,
+                                       @Param("ano") int ano,
+                                       @Param("semanas") List<Integer> semanas);
 }

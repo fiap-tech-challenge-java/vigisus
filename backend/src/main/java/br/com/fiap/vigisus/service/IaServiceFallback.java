@@ -47,6 +47,11 @@ public class IaServiceFallback implements IaService {
     }
 
     @Override
+    public String gerarTextoOperacional(String contexto) {
+        return "Briefing operacional: " + contexto;
+    }
+
+    @Override
     public IntencaoDTO interpretarPergunta(String pergunta) {
         Integer ano = null;
         String doenca = null;
