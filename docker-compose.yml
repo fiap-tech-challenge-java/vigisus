@@ -2,18 +2,18 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15
     container_name: vigisus-postgres
     environment:
       POSTGRES_DB: vigisus
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: vigisus
+      POSTGRES_PASSWORD: vigisus123
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U vigisus"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,8 +25,8 @@ services:
     container_name: vigisus-backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vigisus
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_USERNAME: vigisus
+      SPRING_DATASOURCE_PASSWORD: vigisus123
     ports:
       - "8080:8080"
     depends_on:
@@ -34,17 +34,12 @@ services:
         condition: service_healthy
 
   frontend:
-    image: node:20-alpine
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: vigisus-frontend
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
-    command: sh -c "npm install && npm start"
-    environment:
-      - REACT_APP_API_URL=http://localhost:8080
-      - CHOKIDAR_USEPOLLING=true
     ports:
-      - "3000:3000"
+      - "5173:5173"
     depends_on:
       - backend
 
