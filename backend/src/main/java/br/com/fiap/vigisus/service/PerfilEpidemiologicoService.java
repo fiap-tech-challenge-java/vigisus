@@ -1,6 +1,7 @@
 package br.com.fiap.vigisus.service;
 
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
+import br.com.fiap.vigisus.dto.ComparativoEstadoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
@@ -13,6 +14,7 @@ public class PerfilEpidemiologicoService {
 
     private final MunicipioService municipioService;
     private final CasoDengueRepository casoDengueRepository;
+    private final RankingService rankingService;
 
     public PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, int ano) {
         Municipio municipio = municipioService.buscarPorCoIbge(coIbge);
@@ -31,6 +33,11 @@ public class PerfilEpidemiologicoService {
 
         String classificacao = classificar(incidencia);
 
+        String posicao = rankingService.calcularPosicaoNoEstado(coIbge, municipio.getSgUf(), doenca, ano);
+        ComparativoEstadoDTO comparativoEstado = posicao != null
+                ? ComparativoEstadoDTO.builder().posicaoRankingEstado(posicao).build()
+                : null;
+
         return PerfilEpidemiologicoResponse.builder()
                 .coIbge(coIbge)
                 .municipio(municipio.getNoMunicipio())
@@ -40,6 +47,7 @@ public class PerfilEpidemiologicoService {
                 .total(total)
                 .incidencia(incidencia)
                 .classificacao(classificacao)
+                .comparativoEstado(comparativoEstado)
                 .build();
     }
 

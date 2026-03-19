@@ -13,6 +13,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +27,9 @@ class PerfilEpidemiologicoServiceTest {
     @Mock
     private CasoDengueRepository casoDengueRepository;
 
+    @Mock
+    private RankingService rankingService;
+
     private PerfilEpidemiologicoService service;
 
     private static final String CO_IBGE = "3131307";
@@ -31,7 +37,9 @@ class PerfilEpidemiologicoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PerfilEpidemiologicoService(municipioService, casoDengueRepository);
+        service = new PerfilEpidemiologicoService(municipioService, casoDengueRepository, rankingService);
+        lenient().when(rankingService.calcularPosicaoNoEstado(anyString(), anyString(), anyString(), anyInt()))
+                .thenReturn("1 de 10");
     }
 
     // ── testCalculaIncidenciaCorretamente ─────────────────────────────────────
