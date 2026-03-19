@@ -91,6 +91,27 @@ public class EncaminhamentoService {
     }
 
     /**
+     * Maps a clinical severity string to a CNES bed-type code (tp_leito).
+     * <ul>
+     *   <li>"grave" or "critica" → "81" (UTI adulto)</li>
+     *   <li>anything else       → "74" (clínico adulto)</li>
+     * </ul>
+     *
+     * @param gravidade severity label (case-insensitive)
+     * @return tp_leito code
+     */
+    public String resolverTpLeito(String gravidade) {
+        if (gravidade == null) {
+            return "74";
+        }
+        String g = gravidade.strip().toLowerCase();
+        if (g.equals("grave") || g.equals("critica") || g.equals("crítica")) {
+            return "81";
+        }
+        return "74";
+    }
+
+    /**
      * Calculates the great-circle distance between two points using the Haversine formula.
      *
      * @return distance in kilometres

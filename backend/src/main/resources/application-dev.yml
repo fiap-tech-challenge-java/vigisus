@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    br.com.vigisus: DEBUG
+    br.com.fiap.vigisus: DEBUG
