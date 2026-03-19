@@ -25,6 +25,8 @@ server:
 
 vigisus:
   ia:
-    api-key: ${VIGISUS_IA_API_KEY:}
-    model: ${VIGISUS_IA_MODEL:gpt-4o-mini}
+    api-key: ${OPENAI_API_KEY:sk-fake-key-for-dev}
+    model: gpt-4o-mini
+    max-tokens: 500
+    temperature: 0.3
     url: ${VIGISUS_IA_URL:https://api.openai.com/v1/chat/completions}
