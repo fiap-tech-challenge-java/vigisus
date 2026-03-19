@@ -1,5 +1,6 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.exception.DadosInsuficientesException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.model.Municipio;
@@ -19,6 +20,10 @@ public class PerfilEpidemiologicoService {
 
         long total = casoDengueRepository
                 .sumTotalCasosByCoMunicipioAndAno(coIbge, ano);
+
+        if (total == 0) {
+            throw new DadosInsuficientesException(municipio.getNoMunicipio(), ano);
+        }
 
         long populacao = municipio.getPopulacao() != null && municipio.getPopulacao() > 0
                 ? municipio.getPopulacao()
