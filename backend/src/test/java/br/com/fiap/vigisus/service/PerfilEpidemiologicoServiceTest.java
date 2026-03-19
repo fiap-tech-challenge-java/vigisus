@@ -1,6 +1,7 @@
 package br.com.fiap.vigisus.service;
 
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
+import br.com.fiap.vigisus.exception.DadosInsuficientesException;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -83,6 +85,25 @@ class PerfilEpidemiologicoServiceTest {
 
         assertThat(response.getIncidencia()).isGreaterThan(300.0);
         assertThat(response.getClassificacao()).isEqualTo("EPIDEMIA");
+    }
+
+    // ── testLancaDadosInsuficientesQuandoSemCasos ─────────────────────────────
+
+    @Test
+    void testLancaDadosInsuficientesQuandoSemCasos() {
+        Municipio municipio = Municipio.builder()
+                .coIbge(CO_IBGE)
+                .noMunicipio("Lavras")
+                .sgUf("MG")
+                .populacao(POPULACAO)
+                .build();
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipio);
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024))
+                .thenReturn(0L);
+
+        assertThatThrownBy(() -> service.gerarPerfil(CO_IBGE, "dengue", 2024))
+                .isInstanceOf(DadosInsuficientesException.class)
+                .hasMessage("Dados insuficientes para Lavras no ano 2024");
     }
 
     // ── classificar thresholds (boundary tests) ────────────────────────────────
