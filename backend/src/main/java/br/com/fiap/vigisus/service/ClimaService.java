@@ -4,6 +4,7 @@ import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoDailyData;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoResponse;
+import br.com.fiap.vigisus.exception.ApiExternaException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,7 @@ public class ClimaService {
         OpenMeteoResponse response = restTemplate.getForObject(url, OpenMeteoResponse.class);
 
         if (response == null || response.getCurrent() == null) {
-            throw new RuntimeException("Falha ao obter dados climáticos atuais");
+            throw new ApiExternaException("Open-Meteo");
         }
 
         return ClimaAtualDTO.builder()
@@ -55,7 +56,7 @@ public class ClimaService {
         OpenMeteoResponse response = restTemplate.getForObject(url, OpenMeteoResponse.class);
 
         if (response == null || response.getDaily() == null) {
-            throw new RuntimeException("Falha ao obter previsão climática");
+            throw new ApiExternaException("Open-Meteo");
         }
 
         OpenMeteoDailyData daily = response.getDaily();

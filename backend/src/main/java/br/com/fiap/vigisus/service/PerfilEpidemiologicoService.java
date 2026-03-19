@@ -1,6 +1,8 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.exception.DadosInsuficientesException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
+import br.com.fiap.vigisus.dto.ComparativoEstadoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
@@ -14,6 +16,7 @@ public class PerfilEpidemiologicoService {
 
     private final MunicipioService municipioService;
     private final CasoDengueRepository casoDengueRepository;
+    private final RankingService rankingService;
 
     @Cacheable(value = "perfil-epidemiologico", key = "#coIbge + '-' + #doenca + '-' + #ano")
     public PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, int ano) {
@@ -21,6 +24,10 @@ public class PerfilEpidemiologicoService {
 
         long total = casoDengueRepository
                 .sumTotalCasosByCoMunicipioAndAno(coIbge, ano);
+
+        if (total == 0) {
+            throw new DadosInsuficientesException(municipio.getNoMunicipio(), ano);
+        }
 
         long populacao = municipio.getPopulacao() != null && municipio.getPopulacao() > 0
                 ? municipio.getPopulacao()
@@ -33,6 +40,11 @@ public class PerfilEpidemiologicoService {
 
         String classificacao = classificar(incidencia);
 
+        String posicao = rankingService.calcularPosicaoNoEstado(coIbge, municipio.getSgUf(), doenca, ano);
+        ComparativoEstadoDTO comparativoEstado = posicao != null
+                ? ComparativoEstadoDTO.builder().posicaoRankingEstado(posicao).build()
+                : null;
+
         return PerfilEpidemiologicoResponse.builder()
                 .coIbge(coIbge)
                 .municipio(municipio.getNoMunicipio())
@@ -42,6 +54,7 @@ public class PerfilEpidemiologicoService {
                 .total(total)
                 .incidencia(incidencia)
                 .classificacao(classificacao)
+                .comparativoEstado(comparativoEstado)
                 .build();
     }
 

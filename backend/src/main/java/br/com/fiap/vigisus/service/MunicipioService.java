@@ -1,6 +1,6 @@
 package br.com.fiap.vigisus.service;
 
-import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
+import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.MunicipioRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,7 @@ public class MunicipioService {
 
     public Municipio buscarPorCoIbge(String coIbge) {
         return municipioRepository.findByCoIbge(coIbge)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Município não encontrado: " + coIbge));
+                .orElseThrow(() -> new MunicipioNotFoundException(coIbge));
     }
 
     public List<Municipio> listarPorUf(String uf) {

@@ -5,17 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RankingItemDTO {
+public class RankingResponse {
 
-    private int posicao;
-    private String coIbge;
-    private String municipio;
     private String uf;
-    private long totalCasos;
-    private double incidencia;
-    private String classificacao;
+    private String doenca;
+    private int ano;
+    private int totalMunicipiosComDados;
+    private List<RankingMunicipioDTO> ranking;
 }
