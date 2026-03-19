@@ -5,6 +5,7 @@ import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,6 +15,7 @@ public class PerfilEpidemiologicoService {
     private final MunicipioService municipioService;
     private final CasoDengueRepository casoDengueRepository;
 
+    @Cacheable(value = "perfil-epidemiologico", key = "#coIbge + '-' + #doenca + '-' + #ano")
     public PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, int ano) {
         Municipio municipio = municipioService.buscarPorCoIbge(coIbge);
 
