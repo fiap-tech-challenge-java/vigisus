@@ -1,19 +1,22 @@
 version: "3.9"
 
+# As variáveis abaixo são lidas automaticamente do arquivo .env na raiz do projeto.
+# Copie .env.example para .env e preencha os valores antes de executar o Compose.
+
 services:
   postgres:
     image: postgres:15
     container_name: vigisus-postgres
     environment:
-      POSTGRES_DB: vigisus
-      POSTGRES_USER: vigisus
-      POSTGRES_PASSWORD: vigisus123
+      POSTGRES_DB: ${DB_NAME:-vigisus}
+      POSTGRES_USER: ${DB_USER:-vigisus}
+      POSTGRES_PASSWORD: ${DB_PASS:-vigisus123}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vigisus"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vigisus}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,9 +27,13 @@ services:
       dockerfile: Dockerfile
     container_name: vigisus-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vigisus
-      SPRING_DATASOURCE_USERNAME: vigisus
-      SPRING_DATASOURCE_PASSWORD: vigisus123
+      # O host "postgres" corresponde ao nome do serviço acima dentro da rede Docker.
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-vigisus}
+      DB_USER: ${DB_USER:-vigisus}
+      DB_PASS: ${DB_PASS:-vigisus123}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      VIGISUS_IA_MODEL: ${VIGISUS_IA_MODEL:-gpt-4o-mini}
+      VIGISUS_IA_URL: ${VIGISUS_IA_URL:-https://api.openai.com/v1/chat/completions}
     ports:
       - "8080:8080"
     depends_on:
@@ -37,6 +44,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # REACT_APP_* deve ser fornecido em tempo de build pois o CRA incorpora o valor no bundle.
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080}
     container_name: vigisus-frontend
     ports:
       - "5173:5173"
