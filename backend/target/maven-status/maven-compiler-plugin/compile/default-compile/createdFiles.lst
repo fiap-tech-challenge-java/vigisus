@@ -1,0 +1,12 @@
+br/com/fiap/vigisus/model/ServicoEspecializado$ServicoEspecializadoBuilder.class
+br/com/fiap/vigisus/model/Municipio$MunicipioBuilder.class
+br/com/fiap/vigisus/model/Estabelecimento$EstabelecimentoBuilder.class
+br/com/fiap/vigisus/model/CasoDengue$CasoDengueBuilder.class
+br/com/fiap/vigisus/model/Leito$LeitoBuilder.class
+br/com/fiap/vigisus/model/CasoDengue.class
+br/com/fiap/vigisus/model/Leito.class
+br/com/fiap/vigisus/repository/MunicipioRepository.class
+br/com/fiap/vigisus/model/Municipio.class
+br/com/fiap/vigisus/model/ServicoEspecializado.class
+br/com/fiap/vigisus/VigisusApplication.class
+br/com/fiap/vigisus/model/Estabelecimento.class
