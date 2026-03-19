@@ -25,15 +25,10 @@ server:
 
 vigisus:
   ia:
-<<<<<<< copilot/add-security-and-cors-config
-    api-key: ${OPENAI_API_KEY:sk-fake-dev}
-    model: ${VIGISUS_IA_MODEL:gpt-4o-mini}
-=======
     api-key: ${OPENAI_API_KEY:sk-fake-key-for-dev}
-    model: gpt-4o-mini
+    model: ${VIGISUS_IA_MODEL:gpt-4o-mini}
     max-tokens: 500
     temperature: 0.3
->>>>>>> main
     url: ${VIGISUS_IA_URL:https://api.openai.com/v1/chat/completions}
 
 ---
