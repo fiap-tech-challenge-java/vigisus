@@ -1,0 +1,14 @@
+package br.com.fiap.vigisus.repository;
+
+import br.com.fiap.vigisus.model.Estabelecimento;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.List;
+
+@Repository
+public interface EstabelecimentoRepository extends JpaRepository<Estabelecimento, Long> {
+
+    List<Estabelecimento> findByCoCnesIn(Collection<String> coCnesList);
+}
