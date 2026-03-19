@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -12,9 +14,9 @@ import lombok.NoArgsConstructor;
 public class PrevisaoRiscoResponse {
 
     private String coIbge;
-    private String nomeMunicipio;
-    private String doenca;
-    private String nivelRisco;
-    private Double scoreRisco;
+    private String municipio;
+    private int score;
+    private String classificacao;
+    private List<String> fatores;
     private String textoIa;
 }

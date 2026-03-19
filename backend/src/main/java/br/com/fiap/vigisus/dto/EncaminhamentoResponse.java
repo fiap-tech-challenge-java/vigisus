@@ -13,8 +13,22 @@ import java.util.List;
 @AllArgsConstructor
 public class EncaminhamentoResponse {
 
+    private String coIbge;
     private String municipioOrigem;
-    private String condicao;
-    private String gravidade;
+    private String tpLeito;
     private List<HospitalDTO> hospitais;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class HospitalDTO {
+
+        private String coCnes;
+        private String noFantasia;
+        private String coMunicipio;
+        private String nuTelefone;
+        private int qtLeitosSus;
+        private double distanciaKm;
+    }
 }

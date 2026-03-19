@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -14,11 +12,12 @@ import java.util.Map;
 public class PerfilEpidemiologicoResponse {
 
     private String coIbge;
-    private String nomeMunicipio;
-    private String sgUf;
+    private String municipio;
+    private String uf;
     private String doenca;
-    private Integer ano;
-    private Long totalCasos;
-    private Map<Integer, Long> casosPorSemana;
+    private int ano;
+    private long total;
+    private double incidencia;
+    private String classificacao;
     private String textoIa;
 }

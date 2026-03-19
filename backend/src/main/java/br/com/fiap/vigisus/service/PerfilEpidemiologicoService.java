@@ -1,8 +1,57 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
+import br.com.fiap.vigisus.model.Municipio;
+import br.com.fiap.vigisus.repository.CasoDengueRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
-public interface PerfilEpidemiologicoService {
+@Service
+@RequiredArgsConstructor
+public class PerfilEpidemiologicoService {
 
-    PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, Integer ano);
+    private final MunicipioService municipioService;
+    private final CasoDengueRepository casoDengueRepository;
+
+    public PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, int ano) {
+        Municipio municipio = municipioService.buscarPorCoIbge(coIbge);
+
+        long total = casoDengueRepository
+                .sumTotalCasosByCoMunicipioAndAno(coIbge, ano);
+
+        long populacao = municipio.getPopulacao() != null && municipio.getPopulacao() > 0
+                ? municipio.getPopulacao()
+                : 0L;
+        if (populacao == 0L) {
+            throw new RecursoNaoEncontradoException(
+                    "População não disponível para o município: " + coIbge);
+        }
+        double incidencia = (double) total / populacao * 100_000;
+
+        String classificacao = classificar(incidencia);
+
+        return PerfilEpidemiologicoResponse.builder()
+                .coIbge(coIbge)
+                .municipio(municipio.getNoMunicipio())
+                .uf(municipio.getSgUf())
+                .doenca(doenca)
+                .ano(ano)
+                .total(total)
+                .incidencia(incidencia)
+                .classificacao(classificacao)
+                .build();
+    }
+
+    private String classificar(double incidencia) {
+        if (incidencia < 50) {
+            return "BAIXO";
+        } else if (incidencia < 100) {
+            return "MODERADO";
+        } else if (incidencia <= 300) {
+            return "ALTO";
+        } else {
+            return "EPIDEMIA";
+        }
+    }
 }

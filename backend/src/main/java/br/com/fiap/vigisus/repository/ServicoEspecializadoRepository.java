@@ -6,13 +6,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import java.util.Collection;
+import java.util.Set;
 
 @Repository
 public interface ServicoEspecializadoRepository extends JpaRepository<ServicoEspecializado, Long> {
 
-    List<ServicoEspecializado> findByCoCnesAndServEsp(String coCnes, String servEsp);
-
-    @Query("SELECT DISTINCT s.coCnes FROM ServicoEspecializado s WHERE s.servEsp = :servEsp")
-    List<String> findCoCnesByServEsp(@Param("servEsp") String servEsp);
+    @Query("SELECT DISTINCT s.coCnes FROM ServicoEspecializado s WHERE s.servEsp IN :servEsps")
+    Set<String> findDistinctCoCnesByServEspIn(@Param("servEsps") Collection<String> servEsps);
 }

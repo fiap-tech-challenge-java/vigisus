@@ -29,7 +29,7 @@ public class PrevisaoRiscoController {
             @PathVariable String coIbge,
             @RequestParam(defaultValue = "dengue") String doenca) {
 
-        PrevisaoRiscoResponse previsao = previsaoRiscoService.calcularRisco(coIbge, doenca);
+        PrevisaoRiscoResponse previsao = previsaoRiscoService.calcularRisco(coIbge);
         previsao.setTextoIa(iaService.gerarTextoRisco(previsao));
         return previsao;
     }

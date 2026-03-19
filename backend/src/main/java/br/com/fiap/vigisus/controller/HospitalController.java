@@ -1,6 +1,6 @@
 package br.com.fiap.vigisus.controller;
 
-import br.com.fiap.vigisus.dto.HospitalDTO;
+import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.service.EncaminhamentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,12 +24,11 @@ public class HospitalController {
 
     @GetMapping
     @Operation(summary = "Lista hospitais num raio informado com o serviço solicitado")
-    public List<HospitalDTO> getHospitais(
+    public List<EncaminhamentoResponse.HospitalDTO> getHospitais(
             @RequestParam String municipio,
-            @RequestParam(required = false) String servico,
-            @RequestParam(defaultValue = "300") Integer raioKm,
-            @RequestParam(defaultValue = "74") String tpLeito) {
+            @RequestParam(defaultValue = "74") String tpLeito,
+            @RequestParam(defaultValue = "1") int minLeitosSus) {
 
-        return encaminhamentoService.buscarHospitaisPorRaio(municipio, servico, raioKm, tpLeito);
+        return encaminhamentoService.buscarHospitais(municipio, tpLeito, minLeitosSus).getHospitais();
     }
 }
