@@ -22,3 +22,9 @@ springdoc:
 
 server:
   port: 8080
+
+vigisus:
+  ia:
+    api-key: ${VIGISUS_IA_API_KEY:}
+    model: ${VIGISUS_IA_MODEL:gpt-4o-mini}
+    url: ${VIGISUS_IA_URL:https://api.openai.com/v1/chat/completions}
