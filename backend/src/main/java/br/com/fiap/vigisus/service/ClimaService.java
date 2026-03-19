@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoDailyData;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoResponse;
 import br.com.fiap.vigisus.exception.ApiExternaException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -21,6 +22,7 @@ public class ClimaService {
 
     private final RestTemplate restTemplate;
 
+    @Cacheable(value = "clima-atual", key = "#lat + ',' + #lon")
     public ClimaAtualDTO buscarClimaAtual(double lat, double lon) {
         String url = UriComponentsBuilder.fromHttpUrl(OPEN_METEO_URL)
                 .queryParam("latitude", lat)

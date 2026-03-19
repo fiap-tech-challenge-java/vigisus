@@ -5,6 +5,7 @@ import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.model.Municipio;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public class PrevisaoRiscoService {
     private final MunicipioService municipioService;
     private final ClimaService climaService;
 
+    @Cacheable(value = "previsao-risco", key = "#coIbge")
     public PrevisaoRiscoResponse calcularRisco(String coIbge) {
         Municipio municipio = municipioService.buscarPorCoIbge(coIbge);
 

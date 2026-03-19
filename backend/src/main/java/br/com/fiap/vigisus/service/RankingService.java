@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import br.com.fiap.vigisus.repository.MunicipioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ public class RankingService {
     private final MunicipioRepository municipioRepository;
     private final CasoDengueRepository casoDengueRepository;
 
+    @Cacheable(value = "ranking-municipal", key = "#uf + '-' + #doenca + '-' + #ano")
     public RankingResponse calcularRanking(String uf, String doenca, int ano, int top, String ordem) {
         int topLimitado = Math.min(top, MAX_RANKING_LIMIT);
 
