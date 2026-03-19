@@ -9,16 +9,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PerfilEpidemiologicoResponse {
+public class RankingMunicipioDTO {
 
+    private int posicao;
     private String coIbge;
     private String municipio;
-    private String uf;
-    private String doenca;
-    private int ano;
-    private long total;
-    private double incidencia;
+    private long totalCasos;
+    private long populacao;
+    private double incidencia100k;
     private String classificacao;
-    private String textoIa;
-    private ComparativoEstadoDTO comparativoEstado;
 }
