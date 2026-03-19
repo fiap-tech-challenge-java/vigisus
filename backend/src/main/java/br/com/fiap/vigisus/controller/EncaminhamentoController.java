@@ -26,9 +26,12 @@ public class EncaminhamentoController {
             @RequestParam String municipio,
             @RequestParam(defaultValue = "dengue") String condicao,
             @RequestParam(defaultValue = "moderada") String gravidade,
-            @RequestParam(defaultValue = "74") String tpLeito,
+            @RequestParam(required = false) String tpLeito,
             @RequestParam(defaultValue = "1") int minLeitosSus) {
 
-        return encaminhamentoService.buscarHospitais(municipio, tpLeito, minLeitosSus);
+        String leito = (tpLeito != null && !tpLeito.isBlank())
+                ? tpLeito
+                : encaminhamentoService.resolverTpLeito(gravidade);
+        return encaminhamentoService.buscarHospitais(municipio, leito, minLeitosSus);
     }
 }
