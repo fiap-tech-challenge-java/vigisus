@@ -87,6 +87,18 @@ public class IaServiceImpl implements IaService {
     }
 
     @Override
+    public String gerarTextoOperacional(String contexto) {
+        String systemPrompt = "Você é um médico coordenador de urgência do SUS.\n" +
+                "Escreva um briefing operacional DIRETO (máximo 5 linhas)\n" +
+                "para o gestor da unidade de saúde.\n" +
+                "Inclua: situação atual, tendência, ação recomendada.\n" +
+                "NÃO use jargões. Seja objetivo como se fosse uma mensagem\n" +
+                "de WhatsApp para o chefe de plantão.";
+
+        return chamarIa(systemPrompt, contexto);
+    }
+
+    @Override
     public IntencaoDTO interpretarPergunta(String pergunta) {
         String systemPrompt = "Extraia informações de uma pergunta sobre saúde pública.\n" +
                 "Retorne APENAS um JSON válido, sem markdown, sem explicação.\n" +

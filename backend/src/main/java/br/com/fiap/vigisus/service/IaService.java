@@ -11,4 +11,6 @@ public interface IaService {
     String gerarTextoRisco(PrevisaoRiscoResponse previsao);
 
     IntencaoDTO interpretarPergunta(String pergunta);
+
+    String gerarTextoOperacional(String contexto);
 }
