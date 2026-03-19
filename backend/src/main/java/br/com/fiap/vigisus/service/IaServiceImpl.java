@@ -125,6 +125,20 @@ public class IaServiceImpl implements IaService {
         }
     }
 
+    @Override
+    public String gerarTextoTriagem(String prioridade, List<String> sintomas, String alertaEpidemiologico) {
+        String systemPrompt = "Você é um enfermeiro triagista experiente do SUS.\n" +
+                "Baseado nos dados abaixo, escreva uma orientação clara\n" +
+                "(máximo 3 linhas) para o profissional de saúde.\n" +
+                "NÃO diagnostique. Contextualize o risco e oriente a conduta.";
+
+        String userPrompt = String.format(
+                "Dados: prioridade=%s, sintomas=%s, contexto=%s",
+                prioridade, sintomas, alertaEpidemiologico);
+
+        return chamarIa(systemPrompt, userPrompt);
+    }
+
     private String chamarIa(String systemPrompt, String userPrompt) {
         OpenAiRequest request = OpenAiRequest.builder()
                 .model(model)
