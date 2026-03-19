@@ -74,4 +74,12 @@ public class IaServiceFallback implements IaService {
                 .ano(ano != null ? ano : Year.now().getValue())
                 .build();
     }
+
+    @Override
+    public String gerarTextoTriagem(String prioridade, List<String> sintomas, String alertaEpidemiologico) {
+        return String.format(
+                "Prioridade %s. Sintomas relatados: %s. %s " +
+                "Oriente o profissional de saúde conforme protocolo municipal.",
+                prioridade, sintomas, alertaEpidemiologico);
+    }
 }
