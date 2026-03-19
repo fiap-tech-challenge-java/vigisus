@@ -25,6 +25,22 @@ server:
 
 vigisus:
   ia:
-    api-key: ${VIGISUS_IA_API_KEY:}
+    api-key: ${OPENAI_API_KEY:sk-fake-dev}
     model: ${VIGISUS_IA_MODEL:gpt-4o-mini}
     url: ${VIGISUS_IA_URL:https://api.openai.com/v1/chat/completions}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
+  jpa:
+    show-sql: false
+
+vigisus:
+  ia:
+    api-key: ${OPENAI_API_KEY}
