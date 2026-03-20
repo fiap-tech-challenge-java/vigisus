@@ -5,6 +5,7 @@ import br.com.fiap.vigisus.dto.EncaminhamentoResponse.HospitalDTO;
 import br.com.fiap.vigisus.model.Estabelecimento;
 import br.com.fiap.vigisus.model.Leito;
 import br.com.fiap.vigisus.model.Municipio;
+import br.com.fiap.vigisus.model.ServicoEspecializado;
 import br.com.fiap.vigisus.repository.EstabelecimentoRepository;
 import br.com.fiap.vigisus.repository.LeitoRepository;
 import br.com.fiap.vigisus.repository.ServicoEspecializadoRepository;
@@ -17,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -87,25 +87,22 @@ class EncaminhamentoServiceTest {
                 .build();
 
         when(municipioService.buscarPorCoIbge("3131307")).thenReturn(lavras);
-        when(servicoEspecializadoRepository.findDistinctCoCnesByServEspIn(any()))
-                .thenReturn(Set.of("CNES001", "CNES002"));
 
         Leito leito1 = Leito.builder().coCnes("CNES001").tpLeito("81").qtSus(5).build();
         Leito leito2 = Leito.builder().coCnes("CNES002").tpLeito("81").qtSus(3).build();
-        when(leitoRepository.findByCoCnesInAndTpLeitoAndQtSusGreaterThanEqual(
-                any(), eq("81"), anyInt()))
+        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("81"), anyInt()))
                 .thenReturn(List.of(leito1, leito2));
 
-        // Hospital farther away (Varginha ~98 km)
+        // Hospital farther away (~30 km from Lavras, within 50 km radius)
         Estabelecimento hospVarginha = Estabelecimento.builder()
                 .coCnes("CNES001")
                 .noFantasia("Hospital Varginha")
                 .coMunicipio("3170909")
-                .nuLatitude(-21.551)
-                .nuLongitude(-45.430)
+                .nuLatitude(-21.510)
+                .nuLongitude(-45.200)
                 .build();
 
-        // Hospital closer (within Lavras ~5 km offset)
+        // Hospital closer (within Lavras ~2 km offset)
         Estabelecimento hospLavras = Estabelecimento.builder()
                 .coCnes("CNES002")
                 .noFantasia("Hospital Lavras")
@@ -116,6 +113,7 @@ class EncaminhamentoServiceTest {
 
         when(estabelecimentoRepository.findByCoCnesIn(any()))
                 .thenReturn(List.of(hospVarginha, hospLavras));
+        when(servicoEspecializadoRepository.findByCoCnesIn(any())).thenReturn(List.of());
 
         EncaminhamentoResponse response = service.buscarHospitais("3131307", "81", 1);
 
@@ -125,6 +123,77 @@ class EncaminhamentoServiceTest {
                 .isLessThan(hospitais.get(1).getDistanciaKm());
         assertThat(hospitais.get(0).getNoFantasia()).isEqualTo("Hospital Lavras");
         assertThat(hospitais.get(1).getNoFantasia()).isEqualTo("Hospital Varginha");
+    }
+
+    @Test
+    void testBuscarHospitaisExpandeRaioQuandoVazio() {
+        // Municipality with no hospitals within 50 km, but one within 150 km
+        Municipio municipio = Municipio.builder()
+                .coIbge("1234567")
+                .noMunicipio("Municipio Remoto")
+                .nuLatitude(-10.0)
+                .nuLongitude(-50.0)
+                .build();
+
+        when(municipioService.buscarPorCoIbge("1234567")).thenReturn(municipio);
+
+        Leito leito = Leito.builder().coCnes("CNES999").tpLeito("74").qtSus(2).build();
+        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("74"), anyInt()))
+                .thenReturn(List.of(leito));
+
+        // Hospital about 100 km away (within 150 km radius but not 50 km)
+        Estabelecimento hosp = Estabelecimento.builder()
+                .coCnes("CNES999")
+                .noFantasia("Hospital Distante")
+                .coMunicipio("9999999")
+                .nuLatitude(-10.9)   // ~100 km south
+                .nuLongitude(-50.0)
+                .build();
+
+        when(estabelecimentoRepository.findByCoCnesIn(any())).thenReturn(List.of(hosp));
+        when(servicoEspecializadoRepository.findByCoCnesIn(any())).thenReturn(List.of());
+
+        EncaminhamentoResponse response = service.buscarHospitais("1234567", "74", 1);
+
+        assertThat(response.getHospitais()).hasSize(1);
+        assertThat(response.getHospitais().get(0).getNoFantasia()).isEqualTo("Hospital Distante");
+    }
+
+    @Test
+    void testBuscarHospitaisServiceInfectologiaFlag() {
+        Municipio municipio = Municipio.builder()
+                .coIbge("3131307")
+                .noMunicipio("Lavras")
+                .nuLatitude(LAT_LAVRAS)
+                .nuLongitude(LON_LAVRAS)
+                .build();
+
+        when(municipioService.buscarPorCoIbge("3131307")).thenReturn(municipio);
+
+        Leito leito = Leito.builder().coCnes("CNES001").tpLeito("74").qtSus(1).build();
+        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("74"), anyInt()))
+                .thenReturn(List.of(leito));
+
+        Estabelecimento hosp = Estabelecimento.builder()
+                .coCnes("CNES001")
+                .noFantasia("Hospital Infectologia")
+                .coMunicipio("3131307")
+                .nuLatitude(LAT_LAVRAS)
+                .nuLongitude(LON_LAVRAS)
+                .build();
+
+        when(estabelecimentoRepository.findByCoCnesIn(any())).thenReturn(List.of(hosp));
+
+        ServicoEspecializado servico = ServicoEspecializado.builder()
+                .coCnes("CNES001")
+                .servEsp("135")
+                .build();
+        when(servicoEspecializadoRepository.findByCoCnesIn(any())).thenReturn(List.of(servico));
+
+        EncaminhamentoResponse response = service.buscarHospitais("3131307", "74", 1);
+
+        assertThat(response.getHospitais()).hasSize(1);
+        assertThat(response.getHospitais().get(0).isServicoInfectologia()).isTrue();
     }
 
     // ── resolverTpLeito ────────────────────────────────────────────────────────

@@ -30,5 +30,6 @@ public class EncaminhamentoResponse {
         private String nuTelefone;
         private int qtLeitosSus;
         private double distanciaKm;
+        private boolean servicoInfectologia;
     }
 }

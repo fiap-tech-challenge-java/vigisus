@@ -13,4 +13,6 @@ public interface LeitoRepository extends JpaRepository<Leito, Long> {
     List<Leito> findByCoCnesInAndTpLeitoAndQtSusGreaterThanEqual(Collection<String> coCnesList,
                                                                   String tpLeito,
                                                                   int minQtSus);
+
+    List<Leito> findByTpLeitoAndQtSusGreaterThanEqual(String tpLeito, int minQtSus);
 }
