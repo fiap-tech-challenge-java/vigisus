@@ -27,9 +27,17 @@ public class PressaoOperacionalController {
 
     @PostMapping("/pressao")
     @Operation(
-            summary = "Avalia pressão operacional da unidade de saúde",
-            description = "Cruza suspeitas do dia com contexto epidemiológico e previsão climática " +
-                    "para orientar decisões operacionais do profissional de saúde.")
+            summary = "Contexto operacional da unidade de saúde",
+            description = """
+                    Organiza dados epidemiológicos, climáticos e de infraestrutura
+                    em um contexto informacional consolidado para apoio à decisão
+                    do profissional de saúde.
+
+                    NÃO realiza triagem clínica, diagnóstico ou definição de conduta.
+                    A decisão final permanece com o profissional de saúde habilitado.
+
+                    Fontes: SINAN (casos), CNES (hospitais), Open-Meteo (clima), IBGE (população).
+                    """)
     public PressaoOperacionalResponse avaliarPressao(@RequestBody PressaoOperacionalRequest request) {
         return pressaoOperacionalService.avaliarPressao(request);
     }

@@ -21,7 +21,22 @@ public class EncaminhamentoController {
     private final EncaminhamentoService encaminhamentoService;
 
     @GetMapping
-    @Operation(summary = "Retorna hospitais mais próximos com estrutura adequada para a condição e gravidade informadas")
+    @Operation(
+            summary = "Hospitais com estrutura compatível",
+            description = """
+                    Retorna hospitais ordenados por distância com leitos SUS
+                    disponíveis e serviço de infectologia, baseado no CNES
+                    (Cadastro Nacional de Estabelecimentos de Saúde).
+
+                    IMPORTANTE: O CNES informa capacidade instalada (leitos que
+                    o hospital possui). A confirmação de disponibilidade no momento
+                    do encaminhamento deve ser feita por telefone — número fornecido
+                    na resposta.
+
+                    Retorna contexto informacional baseado em dados públicos do SUS.
+                    Não realiza diagnóstico, triagem clínica nem define conduta médica.
+                    A decisão de encaminhamento permanece com o profissional de saúde.
+                    """)
     public EncaminhamentoResponse getEncaminhamento(
             @RequestParam String municipio,
             @RequestParam(defaultValue = "dengue") String condicao,

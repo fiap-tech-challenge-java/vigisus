@@ -112,9 +112,9 @@ class PressaoOperacionalServiceTest {
         PressaoOperacionalRequest req = new PressaoOperacionalRequest(CO_IBGE, 12, "UPA");
         PressaoOperacionalResponse resp = service.avaliarPressao(req);
 
-        assertThat(resp.getNivelPressao()).isEqualTo("CRITICA");
-        assertThat(resp.getRecomendacao().getAcao()).isEqualTo("ATIVAR_PROTOCOLO");
-        assertThat(resp.getRecomendacao().getMedidasSugeridas()).isNotEmpty();
+        assertThat(resp.getNivelAtencao()).isEqualTo("CRITICO");
+        assertThat(resp.getChecklistInformativo()).isNotEmpty();
+        assertThat(resp.getContextoAtual()).isNotBlank();
     }
 
     // ── testUBSComPoucasSuspeitasContextoBaixoDeveSerNormal ───────────────────
@@ -142,8 +142,8 @@ class PressaoOperacionalServiceTest {
         PressaoOperacionalRequest req = new PressaoOperacionalRequest(CO_IBGE, 1, "UBS");
         PressaoOperacionalResponse resp = service.avaliarPressao(req);
 
-        assertThat(resp.getNivelPressao()).isEqualTo("NORMAL");
-        assertThat(resp.getRecomendacao().getAcao()).isEqualTo("ROTINA");
+        assertThat(resp.getNivelAtencao()).isEqualTo("NORMAL");
+        assertThat(resp.getChecklistInformativo()).isNotEmpty();
     }
 
     // ── testHospitaisReferenciaSaoRetornadosOrdenadosPorDistancia ─────────────
@@ -190,35 +190,34 @@ class PressaoOperacionalServiceTest {
         assertThat(result.get(0).getNoFantasia()).isEqualTo("Hospital Lavras");
     }
 
-    // ── testNivelPressaoCalculation (unit tests for scoring) ──────────────────
+    // ── testNivelAtencaoCalculation (unit tests for scoring) ──────────────────
 
     @Test
     void testScoreApenasComSuspeitasAltas_deveSerNormal() {
         // suspeitasDia: 7 → +2; classificação BAIXO → +0; tendência ESTAVEL → +0; sem risco → +0
-        // score = 2 → NORMAL
-        // Wait: 2 <= 2 → NORMAL per spec
+        // score = 2 → NORMAL (score <= 2)
         PrevisaoRiscoResponse riscoNulo = PrevisaoRiscoResponse.builder()
                 .score(0).classificacao("BAIXO").fatores(List.of()).build();
-        String nivel = service.calcularNivelPressao(7, "BAIXO", "ESTAVEL", riscoNulo);
+        String nivel = service.calcularNivelAtencao(7, "BAIXO", "ESTAVEL", riscoNulo);
         assertThat(nivel).isEqualTo("NORMAL");
     }
 
     @Test
-    void testScoreComSuspeitasEEpidemia_deveSerElevada() {
-        // suspeitasDia: 5 → +2; EPIDEMIA → +3; score = 5 → ELEVADA
+    void testScoreComSuspeitasEEpidemia_deveSerElevado() {
+        // suspeitasDia: 5 → +2; EPIDEMIA → +3; score = 5 → ELEVADO (3-5)
         PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder()
                 .score(0).classificacao("BAIXO").fatores(List.of()).build();
-        String nivel = service.calcularNivelPressao(5, "EPIDEMIA", "ESTAVEL", risco);
-        assertThat(nivel).isEqualTo("ELEVADA");
+        String nivel = service.calcularNivelAtencao(5, "EPIDEMIA", "ESTAVEL", risco);
+        assertThat(nivel).isEqualTo("ELEVADO");
     }
 
     @Test
-    void testScoreCriticaComTodosOsFatores() {
-        // suspeitasDia: 10 → +3; EPIDEMIA → +3; CRESCENTE → +2; MUITO_ALTO → +2; score=10 → CRITICA
+    void testScoreCriticoComTodosOsFatores() {
+        // suspeitasDia: 10 → +3; EPIDEMIA → +3; CRESCENTE → +2; MUITO_ALTO → +2; score=10 → CRITICO
         PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder()
                 .score(7).classificacao("MUITO_ALTO").fatores(List.of()).build();
-        String nivel = service.calcularNivelPressao(10, "EPIDEMIA", "CRESCENTE", risco);
-        assertThat(nivel).isEqualTo("CRITICA");
+        String nivel = service.calcularNivelAtencao(10, "EPIDEMIA", "CRESCENTE", risco);
+        assertThat(nivel).isEqualTo("CRITICO");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

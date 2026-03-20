@@ -28,10 +28,18 @@ public class TriagemController {
 
     @PostMapping("/avaliar")
     @Operation(
-            summary = "Avalia risco do paciente com base em sintomas + contexto epidemiológico real do município",
-            description = "Não realiza diagnóstico. Contextualiza o risco clínico com dados reais do SINAN " +
-                          "para apoiar a decisão do profissional de saúde."
-    )
+            summary = "Contexto clínico-epidemiológico",
+            description = """
+                    Organiza sintomas informados com o contexto epidemiológico
+                    real do município para apoio informacional ao profissional.
+
+                    NÃO realiza triagem clínica, diagnóstico ou classificação
+                    de risco clínico. A avaliação e decisão são exclusivamente
+                    do profissional de saúde habilitado.
+
+                    Retorna contexto informacional baseado em dados públicos do SUS.
+                    Fontes: SINAN (contexto epidemiológico), CNES (hospitais).
+                    """)
     public TriagemResponse avaliar(@Valid @RequestBody TriagemRequest request) {
         return triagemService.avaliar(request);
     }
