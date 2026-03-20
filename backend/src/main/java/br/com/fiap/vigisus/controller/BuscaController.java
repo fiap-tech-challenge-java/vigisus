@@ -16,6 +16,7 @@ import br.com.fiap.vigisus.service.PrevisaoRiscoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/busca")
 @Tag(name = "Busca por Linguagem Natural")
@@ -83,13 +85,28 @@ public class BuscaController {
                     try {
                         return previsaoRiscoService.calcularRisco(coIbge);
                     } catch (Exception e) {
-                        return null;
+                        log.warn("[Busca] Risco indisponível para {}: {}", coIbge, e.getMessage());
+                        return PrevisaoRiscoResponse.builder()
+                                .coIbge(coIbge)
+                                .score(0)
+                                .classificacao("INDISPONIVEL")
+                                .fatores(List.of("Previsão climática temporariamente indisponível"))
+                                .build();
                     }
                 });
 
         CompletableFuture<EncaminhamentoResponse> futureEncaminhamento =
-                CompletableFuture.supplyAsync(() ->
-                        encaminhamentoService.buscarHospitais(coIbge, TP_LEITO_CLINICO, MIN_HOSPITAIS));
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return encaminhamentoService.buscarHospitais(coIbge, TP_LEITO_CLINICO, MIN_HOSPITAIS);
+                    } catch (Exception e) {
+                        log.warn("[Busca] Encaminhamento falhou para {}: {}", coIbge, e.getMessage());
+                        return EncaminhamentoResponse.builder()
+                                .coIbge(coIbge)
+                                .hospitais(List.of())
+                                .build();
+                    }
+                });
 
         CompletableFuture.allOf(futurePerfil, futureRisco, futureEncaminhamento).join();
 
@@ -99,7 +116,17 @@ public class BuscaController {
 
         // 5. Generate unified IA text
         String contextoUnificado = montarContextoUnificado(perfil, risco, encaminhamento);
-        String textoIa = iaService.gerarTextoOperacional(contextoUnificado);
+        String textoIa;
+        try {
+            textoIa = iaService.gerarTextoOperacional(contextoUnificado);
+        } catch (Exception e) {
+            log.warn("[Busca] IA indisponível: {}", e.getMessage());
+            textoIa = String.format(
+                    "Em %d, %s registrou %d casos de %s (incidência: %.1f/100k hab.).",
+                    perfil.getAno(), perfil.getMunicipio(),
+                    perfil.getTotal(), perfil.getDoenca(),
+                    perfil.getIncidencia());
+        }
 
         return BuscaCompletaResponse.builder()
                 .interpretacao(intencao)

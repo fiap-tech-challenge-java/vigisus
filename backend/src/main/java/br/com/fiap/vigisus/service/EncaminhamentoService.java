@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.model.CasoDengue;
 import br.com.fiap.vigisus.model.Estabelecimento;
 import br.com.fiap.vigisus.model.Leito;
 import br.com.fiap.vigisus.model.Municipio;
+import br.com.fiap.vigisus.model.ServicoEspecializado;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import br.com.fiap.vigisus.repository.EstabelecimentoRepository;
 import br.com.fiap.vigisus.repository.LeitoRepository;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +26,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EncaminhamentoService {
 
-    private static final List<String> SERVICOS_INFECCIOSAS = List.of("0135", "0136");
+    // CNES service codes for infectious diseases / infectology
+    private static final List<String> SERVICOS_INFECCIOSAS = List.of("135", "136");
+
+    // Maximum number of hospitals returned per search
+    private static final int MAX_HOSPITAIS = 5;
 
     /** Estimated fraction of dengue cases requiring hospital admission. */
     private static final double TAXA_INTERNACAO_ESTIMADA = 0.05;
@@ -38,55 +44,75 @@ public class EncaminhamentoService {
     public EncaminhamentoResponse buscarHospitais(String coIbge, String tpLeito, int minLeitosSus) {
         Municipio origem = municipioService.buscarPorCoIbge(coIbge);
 
-        // Step 1: CNES codes with infectious disease services
-        Set<String> cnesComServico = servicoEspecializadoRepository
-                .findDistinctCoCnesByServEspIn(SERVICOS_INFECCIOSAS);
+        double lat = origem.getNuLatitude();
+        double lon = origem.getNuLongitude();
 
-        if (cnesComServico.isEmpty()) {
-            return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, List.of(), "NORMAL");
+        // Try increasing radii until at least one result is found
+        int[] raiosKm = {50, 150, 300, 500};
+        List<HospitalDTO> resultados = new ArrayList<>();
+
+        for (int raio : raiosKm) {
+            resultados = buscarNoRaio(lat, lon, tpLeito, minLeitosSus, raio);
+            if (!resultados.isEmpty()) break;
         }
 
-        // Step 2: Leitos matching bed type and minimum SUS quantity
-        List<Leito> leitos = leitoRepository
-                .findByCoCnesInAndTpLeitoAndQtSusGreaterThanEqual(cnesComServico, tpLeito, minLeitosSus);
-
-        if (leitos.isEmpty()) {
-            return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, List.of(), "NORMAL");
-        }
-
-        // Map coCnes → qtSus (pick max in case of duplicates)
-        Map<String, Integer> cnesParaQtSus = leitos.stream()
-                .collect(Collectors.toMap(
-                        Leito::getCoCnes,
-                        Leito::getQtSus,
-                        Integer::max));
-
-        // Step 3: Find establishments for those CNES codes
-        List<Estabelecimento> estabelecimentos = estabelecimentoRepository
-                .findByCoCnesIn(cnesParaQtSus.keySet());
-
-        double latOrigem = origem.getNuLatitude();
-        double lonOrigem = origem.getNuLongitude();
-
-        // Step 4: Build response with distances, sorted ascending
-        List<HospitalDTO> hospitais = estabelecimentos.stream()
-                .filter(e -> e.getNuLatitude() != null && e.getNuLongitude() != null)
-                .map(e -> HospitalDTO.builder()
-                        .coCnes(e.getCoCnes())
-                        .noFantasia(e.getNoFantasia())
-                        .coMunicipio(e.getCoMunicipio())
-                        .nuTelefone(e.getNuTelefone())
-                        .qtLeitosSus(cnesParaQtSus.getOrDefault(e.getCoCnes(), 0))
-                        .distanciaKm(haversine(latOrigem, lonOrigem,
-                                e.getNuLatitude(), e.getNuLongitude()))
-                        .build())
-                .sorted(Comparator.comparingDouble(HospitalDTO::getDistanciaKm))
-                .collect(Collectors.toList());
-
-        int totalLeitosSus = cnesParaQtSus.values().stream().mapToInt(Integer::intValue).sum();
+        int totalLeitosSus = resultados.stream().mapToInt(HospitalDTO::getQtLeitosSus).sum();
         String pressaoSus = calcularPressaoSus(coIbge, totalLeitosSus);
 
-        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, hospitais, pressaoSus);
+        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, resultados, pressaoSus);
+    }
+
+    private List<HospitalDTO> buscarNoRaio(double lat, double lon,
+                                            String tpLeito, int minLeitosSus, int raioKm) {
+        List<Leito> leitos = leitoRepository
+                .findByTpLeitoAndQtSusGreaterThanEqual(tpLeito, minLeitosSus);
+
+        if (leitos.isEmpty()) {
+            return List.of();
+        }
+
+        // Pre-fetch establishments and specialized services to avoid N+1 queries
+        Set<String> cnesSet = leitos.stream().map(Leito::getCoCnes).collect(Collectors.toSet());
+
+        Map<String, Estabelecimento> estPorCnes = estabelecimentoRepository
+                .findByCoCnesIn(cnesSet).stream()
+                .collect(Collectors.toMap(Estabelecimento::getCoCnes, e -> e, (a, b) -> a));
+
+        Map<String, List<ServicoEspecializado>> servicosPorCnes =
+                servicoEspecializadoRepository.findByCoCnesIn(cnesSet).stream()
+                        .collect(Collectors.groupingBy(ServicoEspecializado::getCoCnes));
+
+        List<HospitalDTO> resultado = new ArrayList<>();
+
+        for (Leito leito : leitos) {
+            Estabelecimento est = estPorCnes.get(leito.getCoCnes());
+
+            if (est == null
+                    || est.getNuLatitude() == null
+                    || est.getNuLongitude() == null) continue;
+
+            double dist = haversine(lat, lon, est.getNuLatitude(), est.getNuLongitude());
+
+            if (dist > raioKm) continue;
+
+            boolean temInfecciosas = servicosPorCnes
+                    .getOrDefault(leito.getCoCnes(), List.of())
+                    .stream()
+                    .anyMatch(s -> SERVICOS_INFECCIOSAS.contains(s.getServEsp()));
+
+            resultado.add(HospitalDTO.builder()
+                    .coCnes(est.getCoCnes())
+                    .noFantasia(est.getNoFantasia())
+                    .coMunicipio(est.getCoMunicipio())
+                    .nuTelefone(est.getNuTelefone())
+                    .qtLeitosSus(leito.getQtSus())
+                    .distanciaKm(Math.round(dist * 10.0) / 10.0)
+                    .servicoInfectologia(temInfecciosas)
+                    .build());
+        }
+
+        resultado.sort(Comparator.comparingDouble(HospitalDTO::getDistanciaKm));
+        return resultado.stream().limit(MAX_HOSPITAIS).collect(Collectors.toList());
     }
 
     private EncaminhamentoResponse buildResponse(String coIbge, String municipioOrigem,
