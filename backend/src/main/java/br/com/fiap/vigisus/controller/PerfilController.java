@@ -26,7 +26,18 @@ public class PerfilController {
     private final IaService iaService;
 
     @GetMapping("/{coIbge}")
-    @Operation(summary = "Retorna o perfil epidemiológico completo de um município")
+    @Operation(
+            summary = "Perfil epidemiológico do município",
+            description = """
+                    Retorna o histórico de casos de dengue por semana epidemiológica,
+                    incidência por 100 mil habitantes, classificação e posição no
+                    ranking estadual.
+
+                    Fontes: SINAN (casos notificados), IBGE (população).
+                    Retorna contexto informacional baseado em dados públicos do SUS.
+                    Não realiza diagnóstico, triagem clínica nem define conduta médica.
+                    A decisão final permanece com o profissional de saúde habilitado.
+                    """)
     public PerfilEpidemiologicoResponse getPerfil(
             @PathVariable String coIbge,
             @RequestParam(defaultValue = "dengue") String doenca,

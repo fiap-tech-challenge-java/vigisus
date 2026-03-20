@@ -7,7 +7,6 @@ import br.com.fiap.vigisus.dto.PressaoOperacionalRequest;
 import br.com.fiap.vigisus.dto.PressaoOperacionalResponse;
 import br.com.fiap.vigisus.dto.PressaoOperacionalResponse.ContextoEpidemiologicoDTO;
 import br.com.fiap.vigisus.dto.PressaoOperacionalResponse.PrevisaoProximosDiasDTO;
-import br.com.fiap.vigisus.dto.PressaoOperacionalResponse.RecomendacaoOperacionalDTO;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,35 +38,38 @@ public class PressaoOperacionalService {
         // PASSO 1 — Contexto epidemiológico
         ContextoEpidemiologicoDTO contexto = construirContexto(coIbge);
 
-        // PASSO 2 — Calcular nível de pressão
+        // PASSO 2 — Calcular nível de atenção
         PrevisaoRiscoResponse riscoClimatico = calcularRiscoComFallback(coIbge);
-        String nivelPressao = calcularNivelPressao(req.getSuspeitasDengueDia(),
+        String nivelAtencao = calcularNivelAtencao(req.getSuspeitasDengueDia(),
                 contexto.getClassificacaoAtual(), contexto.getTendencia(), riscoClimatico);
 
         // PASSO 3 — Previsão próximos dias
         PrevisaoProximosDiasDTO previsao = construirPrevisao(riscoClimatico);
 
-        // PASSO 4 — Recomendação operacional
-        RecomendacaoOperacionalDTO recomendacao = construirRecomendacao(nivelPressao,
-                req.getSuspeitasDengueDia(), contexto, previsao);
+        // PASSO 4 — Campos informativos
+        String contextoAtual = montarContextoAtual(req.getSuspeitasDengueDia(),
+                municipio.getNoMunicipio(), contexto.getClassificacaoAtual(), contexto.getTendencia());
+        String padraoHistorico = montarPadraoHistorico(contexto);
+        List<String> checklistInformativo = montarChecklistInformativo(nivelAtencao,
+                municipio.getNoMunicipio(), contexto, previsao);
 
         // PASSO 5 — Hospitais de referência (top 3)
         List<HospitalDTO> hospitaisReferencia = buscarHospitaisReferencia(coIbge);
 
         // PASSO 6 — Texto IA
-        String contextoTexto = formatarContextoParaIa(municipio.getNoMunicipio(),
-                req.getTipoUnidade(), req.getSuspeitasDengueDia(),
-                contexto, previsao, nivelPressao, recomendacao);
+        String contextoTexto = formatarContextoParaIa(contextoAtual, padraoHistorico, nivelAtencao);
         String textoIa = iaService.gerarTextoOperacional(contextoTexto);
 
         return PressaoOperacionalResponse.builder()
                 .municipio(coIbge)
                 .tipoUnidade(req.getTipoUnidade())
-                .nivelPressao(nivelPressao)
+                .nivelAtencao(nivelAtencao)
+                .contextoAtual(contextoAtual)
+                .padraoHistorico(padraoHistorico)
+                .checklistInformativo(checklistInformativo)
                 .contexto(contexto)
                 .previsao(previsao)
                 .hospitaisReferencia(hospitaisReferencia)
-                .recomendacao(recomendacao)
                 .textoIa(textoIa)
                 .build();
     }
@@ -209,7 +211,7 @@ public class PressaoOperacionalService {
 
     // ── PASSO 2 ───────────────────────────────────────────────────────────────
 
-    String calcularNivelPressao(int suspeitasDia, String classificacao,
+    String calcularNivelAtencao(int suspeitasDia, String classificacao,
                                         String tendencia, PrevisaoRiscoResponse risco) {
         int score = 0;
 
@@ -245,8 +247,8 @@ public class PressaoOperacionalService {
         }
 
         if (score <= 2) return "NORMAL";
-        if (score <= 5) return "ELEVADA";
-        return "CRITICA";
+        if (score <= 5) return "ELEVADO";
+        return "CRITICO";
     }
 
     private PrevisaoRiscoResponse calcularRiscoComFallback(String coIbge) {
@@ -276,49 +278,46 @@ public class PressaoOperacionalService {
                 .build();
     }
 
-    // ── PASSO 4 ───────────────────────────────────────────────────────────────
+    // ── PASSO 4 — Campos informativos ────────────────────────────────────────
 
-    private RecomendacaoOperacionalDTO construirRecomendacao(String nivelPressao,
-                                                              int suspeitasDia,
-                                                              ContextoEpidemiologicoDTO contexto,
-                                                              PrevisaoProximosDiasDTO previsao) {
-        return switch (nivelPressao) {
-            case "CRITICA" -> RecomendacaoOperacionalDTO.builder()
-                    .acao("ATIVAR_PROTOCOLO")
-                    .justificativa(String.format(
-                            "Situação crítica: %d suspeitas hoje, contexto %s, tendência %s, risco %s.",
-                            suspeitasDia, contexto.getClassificacaoAtual(),
-                            contexto.getTendencia(), previsao.getRiscoClimatico()))
-                    .medidasSugeridas(List.of(
-                            "ATIVAR PROTOCOLO DE SURTO — comunicar imediatamente à Vigilância Epidemiológica Municipal",
-                            "Solicitar reforço de equipe junto à Secretaria de Saúde",
-                            "Identificar e reservar leitos de observação adicionais",
-                            "Confirmar disponibilidade de vagas nos hospitais de referência",
-                            "Iniciar registro de casos suspeitos para notificação SINAN",
-                            "Verificar disponibilidade de inseticida para nebulização"))
-                    .build();
-            case "ELEVADA" -> RecomendacaoOperacionalDTO.builder()
-                    .acao("ALERTA")
-                    .justificativa(String.format(
-                            "Pressão elevada: %d suspeitas hoje, contexto %s, tendência %s.",
-                            suspeitasDia, contexto.getClassificacaoAtual(), contexto.getTendencia()))
-                    .medidasSugeridas(List.of(
-                            "Ampliar área de observação se possível",
-                            "Priorizar triagem de pacientes febris",
-                            "Verificar estoque de NS1 e material para hemograma",
-                            "Comunicar situação à Secretaria Municipal de Saúde",
-                            "Acionar equipes de saúde da família para busca ativa"))
-                    .build();
-            default -> RecomendacaoOperacionalDTO.builder()
-                    .acao("ROTINA")
-                    .justificativa(String.format(
-                            "Situação sob controle: %d suspeitas hoje, contexto %s.",
-                            suspeitasDia, contexto.getClassificacaoAtual()))
-                    .medidasSugeridas(List.of(
-                            "Manter fluxo normal de atendimento",
-                            "Orientar pacientes sobre sinais de alarme",
-                            "Atualizar estoque de soro fisiológico e dipirona"))
-                    .build();
+    private String montarContextoAtual(int suspeitasDia, String nomeMunicipio,
+                                        String classificacao, String tendencia) {
+        return String.format(
+                "%d suspeitas registradas hoje em %s, município com classificação epidemiológica %s" +
+                " e tendência %s nas últimas 4 semanas.",
+                suspeitasDia, nomeMunicipio, classificacao, tendencia);
+    }
+
+    private String montarPadraoHistorico(ContextoEpidemiologicoDTO contexto) {
+        String comparativo = contexto.getComparativoHistorico();
+        if (comparativo == null || comparativo.contains("não havia registros")) {
+            return "Dados históricos insuficientes para comparação do período.";
+        }
+        return comparativo;
+    }
+
+    private List<String> montarChecklistInformativo(String nivelAtencao, String nomeMunicipio,
+                                                     ContextoEpidemiologicoDTO contexto,
+                                                     PrevisaoProximosDiasDTO previsao) {
+        return switch (nivelAtencao) {
+            case "CRITICO" -> List.of(
+                    "Volume de suspeitas compatível com situação de surto",
+                    String.format("Contexto epidemiológico: %s — %d casos nas últimas 4 semanas",
+                            contexto.getClassificacaoAtual(), contexto.getCasosUltimasSemanas()),
+                    "Padrão climático favorável ao vetor nas próximas 2 semanas: " + previsao.getRiscoClimatico(),
+                    "Hospitais de referência mais próximos disponíveis na lista abaixo",
+                    "Contato Vigilância Epidemiológica Municipal: 0800-644-6645",
+                    "Contato Central de Regulação MG: (31) 3916-6868");
+            case "ELEVADO" -> List.of(
+                    "Número de suspeitas acima da média para o período",
+                    String.format("Contexto epidemiológico: %s — tendência %s",
+                            contexto.getClassificacaoAtual(), contexto.getTendencia()),
+                    "Risco climático nas próximas 2 semanas: " + previsao.getRiscoClimatico(),
+                    "Hospitais de referência com leitos disponíveis listados abaixo");
+            default -> List.of(
+                    "Situação dentro do padrão histórico para o período",
+                    "Capacidade hospitalar regional: verificar lista de referência",
+                    "Previsão climática: " + previsao.getRiscoClimatico());
         };
     }
 
@@ -349,26 +348,8 @@ public class PressaoOperacionalService {
 
     // ── PASSO 6 — Formato do prompt para IA ──────────────────────────────────
 
-    private String formatarContextoParaIa(String nomeMunicipio, String tipoUnidade,
-                                           int suspeitasDia,
-                                           ContextoEpidemiologicoDTO contexto,
-                                           PrevisaoProximosDiasDTO previsao,
-                                           String nivelPressao,
-                                           RecomendacaoOperacionalDTO recomendacao) {
-        return String.format(
-                "Unidade: %s — %s%n" +
-                "Suspeitas de dengue hoje: %d%n" +
-                "Nível de pressão: %s%n" +
-                "Contexto epidemiológico: %s, %d casos nas últimas 4 semanas, tendência %s%n" +
-                "%s%n" +
-                "Risco climático: %s%n" +
-                "Ação recomendada: %s",
-                tipoUnidade, nomeMunicipio,
-                suspeitasDia,
-                nivelPressao,
-                contexto.getClassificacaoAtual(), contexto.getCasosUltimasSemanas(), contexto.getTendencia(),
-                contexto.getComparativoHistorico(),
-                previsao.getRiscoClimatico(),
-                recomendacao.getAcao());
+    private String formatarContextoParaIa(String contextoAtual, String padraoHistorico, String nivelAtencao) {
+        return String.format("Dados: %s | %s | Nível de atenção: %s",
+                contextoAtual, padraoHistorico, nivelAtencao);
     }
 }

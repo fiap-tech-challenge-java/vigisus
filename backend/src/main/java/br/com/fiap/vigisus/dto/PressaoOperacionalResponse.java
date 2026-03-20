@@ -16,12 +16,22 @@ public class PressaoOperacionalResponse {
 
     private String municipio;
     private String tipoUnidade;
-    private String nivelPressao;
+
+    /** NORMAL | ELEVADO | CRITICO */
+    private String nivelAtencao;
+
+    /** Texto descritivo da situação — sem verbo imperativo */
+    private String contextoAtual;
+
+    /** Comparação com mesmo período de anos anteriores */
+    private String padraoHistorico;
+
+    /** Lista informativa — linguagem descritiva, não imperativa */
+    private List<String> checklistInformativo;
 
     private ContextoEpidemiologicoDTO contexto;
     private PrevisaoProximosDiasDTO previsao;
     private List<HospitalDTO> hospitaisReferencia;
-    private RecomendacaoOperacionalDTO recomendacao;
     private String textoIa;
 
     @Data
@@ -42,15 +52,5 @@ public class PressaoOperacionalResponse {
     public static class PrevisaoProximosDiasDTO {
         private String riscoClimatico;
         private String tendencia7Dias;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RecomendacaoOperacionalDTO {
-        private String acao;
-        private String justificativa;
-        private List<String> medidasSugeridas;
     }
 }

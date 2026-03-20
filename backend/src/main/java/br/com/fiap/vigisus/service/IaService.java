@@ -17,4 +17,6 @@ public interface IaService {
     String gerarTextoTriagem(String prioridade, List<String> sintomas, String alertaEpidemiologico);
 
     String gerarTextoOperacional(String contexto);
+
+    String gerarTextoBuscaCompleta(String contexto);
 }

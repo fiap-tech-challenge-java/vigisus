@@ -52,6 +52,11 @@ public class IaServiceFallback implements IaService {
     }
 
     @Override
+    public String gerarTextoBuscaCompleta(String contexto) {
+        return "Resumo informativo: " + contexto;
+    }
+
+    @Override
     public IntencaoDTO interpretarPergunta(String pergunta) {
         Integer ano = null;
         String doenca = null;

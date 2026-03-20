@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class IntencaoDTO {
 
     private String municipio;
+    private String coIbge;
     private String uf;
     private String doenca;
     private Integer ano;
