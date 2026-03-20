@@ -35,4 +35,8 @@ public class PerfilEpidemiologicoResponse {
 
     // Position among state municipalities (e.g. "47º de 853 municípios em MG")
     private String posicaoEstado;
+
+    // Geographic coordinates of the municipality for map centering
+    private Double nuLatitude;
+    private Double nuLongitude;
 }

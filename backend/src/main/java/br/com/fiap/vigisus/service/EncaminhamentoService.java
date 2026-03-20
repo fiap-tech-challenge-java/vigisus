@@ -108,6 +108,8 @@ public class EncaminhamentoService {
                     .qtLeitosSus(leito.getQtSus())
                     .distanciaKm(Math.round(dist * 10.0) / 10.0)
                     .servicoInfectologia(temInfecciosas)
+                    .nuLatitude(est.getNuLatitude())
+                    .nuLongitude(est.getNuLongitude())
                     .build());
         }
 

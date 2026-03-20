@@ -34,5 +34,9 @@ public class EncaminhamentoResponse {
         private int qtLeitosSus;
         private double distanciaKm;
         private boolean servicoInfectologia;
+
+        // Geographic coordinates for map markers
+        private Double nuLatitude;
+        private Double nuLongitude;
     }
 }
