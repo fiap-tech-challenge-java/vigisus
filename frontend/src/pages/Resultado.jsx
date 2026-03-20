@@ -4,6 +4,8 @@ import TextoIa from '../components/TextoIa';
 import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
 import RiscoCard from '../components/RiscoCard';
 import MapaHospitais from '../components/MapaHospitais';
+import HeaderAlerta from '../components/HeaderAlerta';
+import KpiCards from '../components/KpiCards';
 import { buscarRisco, buscarHospitais } from '../services/api';
 
 function Resultado() {
@@ -41,12 +43,18 @@ function Resultado() {
 
   if (!dados) return null;
 
-  const perfil = dados.perfil || {};
-  const anoAtual = perfil.anoAtual || new Date().getFullYear();
-  const anoAnterior = anoAtual - 1;
-
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* BLOCO 1 — Header colorido */}
+      <HeaderAlerta perfil={dados?.perfil} risco={dados?.risco} />
+
+      {/* BLOCO 2 — KPI Cards */}
+      <KpiCards perfil={dados?.perfil} risco={dados?.risco} />
+
+      {/* BLOCO 3 — Gráfico */}
+      <CurvaEpidemiologica perfil={dados?.perfil} />
+
       <header className="bg-sus-green text-white px-4 py-4 shadow">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <button
@@ -80,20 +88,10 @@ function Resultado() {
           </div>
         )}
 
-        {/* Bloco 1 — Texto IA */}
+        {/* Texto IA */}
         <TextoIa texto={dados.textoIa || dados.texto || dados.analise} />
 
-        {/* Bloco 2 — Curva Epidemiológica */}
-        {(perfil.casosAnoAtual || perfil.casosAnoAnterior) && (
-          <CurvaEpidemiologica
-            dadosAnoAtual={perfil.casosAnoAtual}
-            dadosAnoAnterior={perfil.casosAnoAnterior}
-            anoAtual={anoAtual}
-            anoAnterior={anoAnterior}
-          />
-        )}
-
-        {/* Bloco 3 — Risco */}
+        {/* Risco */}
         {loadingRisco ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center text-gray-400">
             Carregando previsão de risco...
@@ -108,7 +106,7 @@ function Resultado() {
           )
         )}
 
-        {/* Bloco 4 — Mapa de Hospitais */}
+        {/* Mapa de Hospitais */}
         {loadingHospitais ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center text-gray-400">
             Carregando hospitais próximos...
