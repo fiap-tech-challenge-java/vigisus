@@ -18,6 +18,9 @@ public class EncaminhamentoResponse {
     private String tpLeito;
     private List<HospitalDTO> hospitais;
 
+    // Health system pressure calculated from estimated bed occupancy
+    private String pressaoSus;
+
     @Data
     @Builder
     @NoArgsConstructor

@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.model.Estabelecimento;
 import br.com.fiap.vigisus.model.Leito;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.model.ServicoEspecializado;
+import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import br.com.fiap.vigisus.repository.EstabelecimentoRepository;
 import br.com.fiap.vigisus.repository.LeitoRepository;
 import br.com.fiap.vigisus.repository.ServicoEspecializadoRepository;
@@ -41,6 +42,9 @@ class EncaminhamentoServiceTest {
     @Mock
     private ServicoEspecializadoRepository servicoEspecializadoRepository;
 
+    @Mock
+    private CasoDengueRepository casoDengueRepository;
+
     private EncaminhamentoService service;
 
     // Lavras coordinates
@@ -50,7 +54,12 @@ class EncaminhamentoServiceTest {
     @BeforeEach
     void setUp() {
         service = new EncaminhamentoService(
-                municipioService, estabelecimentoRepository, leitoRepository, servicoEspecializadoRepository);
+                municipioService, estabelecimentoRepository, leitoRepository, servicoEspecializadoRepository,
+                casoDengueRepository);
+        org.mockito.Mockito.lenient()
+                .when(casoDengueRepository.findByCoMunicipioAndAno(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(java.util.List.of());
     }
 
     // ── haversine ──────────────────────────────────────────────────────────────

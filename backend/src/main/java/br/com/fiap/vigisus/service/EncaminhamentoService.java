@@ -2,16 +2,19 @@ package br.com.fiap.vigisus.service;
 
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse.HospitalDTO;
+import br.com.fiap.vigisus.model.CasoDengue;
 import br.com.fiap.vigisus.model.Estabelecimento;
 import br.com.fiap.vigisus.model.Leito;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.model.ServicoEspecializado;
+import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import br.com.fiap.vigisus.repository.EstabelecimentoRepository;
 import br.com.fiap.vigisus.repository.LeitoRepository;
 import br.com.fiap.vigisus.repository.ServicoEspecializadoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -29,10 +32,14 @@ public class EncaminhamentoService {
     // Maximum number of hospitals returned per search
     private static final int MAX_HOSPITAIS = 5;
 
+    /** Estimated fraction of dengue cases requiring hospital admission. */
+    private static final double TAXA_INTERNACAO_ESTIMADA = 0.05;
+
     private final MunicipioService municipioService;
     private final EstabelecimentoRepository estabelecimentoRepository;
     private final LeitoRepository leitoRepository;
     private final ServicoEspecializadoRepository servicoEspecializadoRepository;
+    private final CasoDengueRepository casoDengueRepository;
 
     public EncaminhamentoResponse buscarHospitais(String coIbge, String tpLeito, int minLeitosSus) {
         Municipio origem = municipioService.buscarPorCoIbge(coIbge);
@@ -49,7 +56,10 @@ public class EncaminhamentoService {
             if (!resultados.isEmpty()) break;
         }
 
-        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, resultados);
+        int totalLeitosSus = resultados.stream().mapToInt(HospitalDTO::getQtLeitosSus).sum();
+        String pressaoSus = calcularPressaoSus(coIbge, totalLeitosSus);
+
+        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, resultados, pressaoSus);
     }
 
     private List<HospitalDTO> buscarNoRaio(double lat, double lon,
@@ -106,12 +116,14 @@ public class EncaminhamentoService {
     }
 
     private EncaminhamentoResponse buildResponse(String coIbge, String municipioOrigem,
-                                                  String tpLeito, List<HospitalDTO> hospitais) {
+                                                  String tpLeito, List<HospitalDTO> hospitais,
+                                                  String pressaoSus) {
         return EncaminhamentoResponse.builder()
                 .coIbge(coIbge)
                 .municipioOrigem(municipioOrigem)
                 .tpLeito(tpLeito)
                 .hospitais(hospitais)
+                .pressaoSus(pressaoSus)
                 .build();
     }
 
@@ -149,5 +161,27 @@ public class EncaminhamentoService {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.pow(Math.sin(dlon / 2), 2);
         return R * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    private String calcularPressaoSus(String coMunicipio, int leitosSus) {
+        int anoAtual = Year.now().getValue();
+        List<CasoDengue> recentes = casoDengueRepository
+                .findByCoMunicipioAndAno(coMunicipio, anoAtual);
+
+        if (recentes.isEmpty() || leitosSus == 0) return "NORMAL";
+
+        long totalRecente = recentes.stream()
+                .sorted(Comparator.comparingInt(CasoDengue::getSemanaEpi).reversed())
+                .limit(4)
+                .mapToLong(CasoDengue::getTotalCasos)
+                .sum();
+
+        double internacaoEstimada = totalRecente * TAXA_INTERNACAO_ESTIMADA;
+        double ocupacaoEstimada = internacaoEstimada / leitosSus;
+
+        if (ocupacaoEstimada < 0.5) return "NORMAL";
+        if (ocupacaoEstimada < 0.75) return "ELEVADA";
+        if (ocupacaoEstimada < 0.9) return "ALTA";
+        return "CRITICA";
     }
 }

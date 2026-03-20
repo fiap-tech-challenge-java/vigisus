@@ -3,6 +3,7 @@ package br.com.fiap.vigisus.service;
 import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
+import br.com.fiap.vigisus.dto.RiscoDiarioDTO;
 import br.com.fiap.vigisus.model.Municipio;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -102,6 +104,7 @@ public class PrevisaoRiscoService {
         }
 
         String classificacao = classificar(score);
+        List<RiscoDiarioDTO> risco14Dias = calcularRisco14Dias(previsao16Dias);
 
         return PrevisaoRiscoResponse.builder()
                 .coIbge(coIbge)
@@ -109,6 +112,7 @@ public class PrevisaoRiscoService {
                 .score(score)
                 .classificacao(classificacao)
                 .fatores(fatores)
+                .risco14Dias(risco14Dias)
                 .build();
     }
 
@@ -122,6 +126,35 @@ public class PrevisaoRiscoService {
         } else {
             return "MUITO_ALTO";
         }
+    }
+
+    private List<RiscoDiarioDTO> calcularRisco14Dias(List<PrevisaoDiariaDTO> previsao) {
+        return previsao.stream().limit(14).map(dia -> {
+            double tempMax = dia.getTemperaturaMaxima() != null ? dia.getTemperaturaMaxima() : 0.0;
+            double chuvaMm = dia.getPrecipitacaoTotal() != null ? dia.getPrecipitacaoTotal() : 0.0;
+            double probChuva = dia.getProbabilidadeChuva() != null ? dia.getProbabilidadeChuva() : 0.0;
+
+            int scoreDia = 0;
+            if (tempMax >= 28) scoreDia += 2;
+            else if (tempMax >= 25) scoreDia += 1;
+            if (chuvaMm >= 20) scoreDia += 2;
+            else if (chuvaMm >= 10) scoreDia += 1;
+            if (probChuva >= 60) scoreDia += 1;
+
+            String classificacaoDia = scoreDia <= 1 ? "BAIXO"
+                    : scoreDia <= 3 ? "MODERADO"
+                    : scoreDia <= 5 ? "ALTO"
+                    : "MUITO_ALTO";
+
+            return RiscoDiarioDTO.builder()
+                    .data(dia.getData())
+                    .scoreDia(scoreDia)
+                    .classificacao(classificacaoDia)
+                    .tempMax(tempMax)
+                    .chuvaMm(chuvaMm)
+                    .probChuva(probChuva)
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     private double[] getCentroideEstado(String sgUf) {

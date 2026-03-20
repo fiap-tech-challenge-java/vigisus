@@ -19,4 +19,7 @@ public class PrevisaoRiscoResponse {
     private String classificacao;
     private List<String> fatores;
     private String textoIa;
+
+    // Daily risk scores for the 14 coloured circles in the front-end
+    private List<RiscoDiarioDTO> risco14Dias;
 }

@@ -29,4 +29,8 @@ public interface CasoDengueRepository extends JpaRepository<CasoDengue, Long> {
     List<Object[]> findCasosPorSemanas(@Param("coMunicipio") String coMunicipio,
                                        @Param("ano") int ano,
                                        @Param("semanas") List<Integer> semanas);
+
+    List<CasoDengue> findByCoMunicipioAndAnoOrderBySemanaEpiAsc(String coMunicipio, int ano);
+
+    List<CasoDengue> findByCoMunicipioAndAno(String coMunicipio, int ano);
 }
