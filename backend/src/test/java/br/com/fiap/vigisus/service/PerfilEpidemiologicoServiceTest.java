@@ -12,6 +12,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
@@ -42,6 +44,10 @@ class PerfilEpidemiologicoServiceTest {
         service = new PerfilEpidemiologicoService(municipioService, casoDengueRepository, rankingService);
         lenient().when(rankingService.calcularPosicaoNoEstado(anyString(), anyString(), anyString(), anyInt()))
                 .thenReturn("1 de 10");
+        lenient().when(casoDengueRepository.findByCoMunicipioAndAnoOrderBySemanaEpiAsc(anyString(), anyInt()))
+                .thenReturn(List.of());
+        lenient().when(municipioService.listarPorUf(anyString()))
+                .thenReturn(List.of());
     }
 
     // ── testCalculaIncidenciaCorretamente ─────────────────────────────────────
