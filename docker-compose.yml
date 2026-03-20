@@ -31,9 +31,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-vigisus}
       DB_USER: ${DB_USER:-vigisus}
       DB_PASS: ${DB_PASS:-vigisus123}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      VIGISUS_IA_MODEL: ${VIGISUS_IA_MODEL:-gpt-4o-mini}
-      VIGISUS_IA_URL: ${VIGISUS_IA_URL:-https://api.openai.com/v1/chat/completions}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:
