@@ -34,6 +34,12 @@ function MapaHospitais({ municipio, lat, lng, hospitais }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
 
+  const lista = (hospitais || []).slice().sort((a, b) => {
+    const da = parseFloat(a.distancia_km ?? a.distancia ?? 9999);
+    const db = parseFloat(b.distancia_km ?? b.distancia ?? 9999);
+    return da - db;
+  });
+
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -52,24 +58,37 @@ function MapaHospitais({ municipio, lat, lng, hospitais }) {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    L.marker([centerLat, centerLng], { icon: blueIcon })
-      .addTo(map)
-      .bindPopup(`<b>${municipio || 'Município buscado'}</b>`)
-      .openPopup();
+    const bounds = [];
 
-    if (hospitais && hospitais.length > 0) {
-      hospitais.forEach((h) => {
+    const munMarker = L.marker([centerLat, centerLng], { icon: blueIcon })
+      .addTo(map)
+      .bindPopup(`<b>${municipio || 'Município buscado'}</b>`);
+    bounds.push([centerLat, centerLng]);
+
+    if (lista.length > 0) {
+      lista.forEach((h) => {
         if (h.lat && h.lng) {
+          const distText = h.distancia_km != null ? `${h.distancia_km} km` : h.distancia || '';
+          const telHtml = h.telefone
+            ? `<br/><a href="tel:${h.telefone}" style="color:#009EE3">${h.telefone}</a>`
+            : '';
           L.marker([h.lat, h.lng], { icon: redIcon })
             .addTo(map)
             .bindPopup(
               `<b>${h.nome || 'Hospital'}</b><br/>` +
-              `${h.distancia ? `Distância: ${h.distancia}<br/>` : ''}` +
-              `${h.leitosSus !== undefined ? `Leitos SUS: ${h.leitosSus}<br/>` : ''}` +
-              `${h.telefone ? `Tel: ${h.telefone}` : ''}`
+              `${distText ? `Distância: ${distText}<br/>` : ''}` +
+              `${h.leitos_sus != null ? `Leitos SUS: ${h.leitos_sus}<br/>` : h.leitosSus != null ? `Leitos SUS: ${h.leitosSus}<br/>` : ''}` +
+              telHtml
             );
+          bounds.push([h.lat, h.lng]);
         }
       });
+
+      if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    } else {
+      munMarker.openPopup();
     }
 
     return () => {
@@ -78,16 +97,71 @@ function MapaHospitais({ municipio, lat, lng, hospitais }) {
         mapInstanceRef.current = null;
       }
     };
-  }, [lat, lng, municipio, hospitais]);
+  }, [lat, lng, municipio, hospitais]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">🏥 Hospitais com Leitos Disponíveis</h2>
-      <div className="flex gap-4 text-sm text-gray-500 mb-3">
-        <span>🔵 Município buscado</span>
-        <span>🔴 Hospitais SUS</span>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <h2 className="text-lg font-bold text-gray-800 mb-4">🏥 Hospitais com estrutura disponível</h2>
+      <div className="flex flex-col md:flex-row gap-4">
+        {/* Mapa */}
+        <div className="flex-1 min-w-0">
+          <div ref={mapRef} style={{ height: '400px', borderRadius: '8px' }} />
+          <div className="flex gap-4 text-xs text-gray-500 mt-2">
+            <span>🔵 Município buscado</span>
+            <span>🔴 Hospitais SUS</span>
+          </div>
+        </div>
+
+        {/* Lista */}
+        <div className="w-full md:w-80 flex flex-col gap-2 overflow-y-auto" style={{ maxHeight: '420px' }}>
+          {lista.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-8">
+              Nenhum hospital encontrado no raio de 300km
+            </p>
+          ) : (
+            lista.map((h, idx) => {
+              const dist = h.distancia_km ?? h.distancia;
+              const leitos = h.leitos_sus ?? h.leitosSus;
+              const tel = h.telefone;
+              const infectologia = h.infectologia ?? h.temInfectologia;
+              const isFirst = idx === 0;
+
+              return (
+                <div
+                  key={idx}
+                  className={`rounded-lg border p-3 text-sm ${
+                    isFirst
+                      ? 'border-red-400 bg-red-50 shadow-sm'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <p className="font-semibold text-gray-900 truncate">
+                    {idx + 1}. {h.nome || 'Hospital'}
+                    {isFirst && (
+                      <span className="ml-1 text-xs text-red-600 font-bold">(mais próximo)</span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-1 text-gray-600 text-xs">
+                    {dist != null && <span>📍 {dist} km</span>}
+                    {leitos != null && <span>🛏 {leitos} leitos SUS</span>}
+                    {infectologia != null && (
+                      <span>Infectologia: {infectologia ? '✅' : '—'}</span>
+                    )}
+                  </div>
+                  {tel && (
+                    <a
+                      href={`tel:${tel}`}
+                      className="text-blue-600 text-xs mt-0.5 block hover:underline"
+                    >
+                      📞 {tel}
+                    </a>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
-      <div ref={mapRef} style={{ height: '400px', borderRadius: '8px' }} />
     </div>
   );
 }

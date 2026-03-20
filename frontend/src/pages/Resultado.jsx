@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import TextoIa from '../components/TextoIa';
+import HeaderAlerta from '../components/HeaderAlerta';
+import KpiCards from '../components/KpiCards';
 import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
-import RiscoCard from '../components/RiscoCard';
+import RiscoFuturo from '../components/RiscoFuturo';
 import MapaHospitais from '../components/MapaHospitais';
+import ResumoIa from '../components/ResumoIa';
 import { buscarRisco, buscarHospitais } from '../services/api';
+
+// Skeleton placeholder for loading state
+function Skeleton({ height = 'h-40', label }) {
+  return (
+    <div className={`bg-gray-100 animate-pulse rounded-xl ${height} flex items-center justify-center`}>
+      <span className="text-gray-400 text-sm">
+        {label ? `Dados de ${label} temporariamente indisponíveis` : 'Carregando...'}
+      </span>
+    </div>
+  );
+}
 
 function Resultado() {
   const location = useLocation();
@@ -15,6 +28,8 @@ function Resultado() {
   const [hospitais, setHospitais] = useState([]);
   const [loadingRisco, setLoadingRisco] = useState(false);
   const [loadingHospitais, setLoadingHospitais] = useState(false);
+  const [erroRisco, setErroRisco] = useState(false);
+  const [erroHospitais, setErroHospitais] = useState(false);
 
   useEffect(() => {
     if (!dados) {
@@ -26,15 +41,17 @@ function Resultado() {
 
     if (coIbge) {
       setLoadingRisco(true);
+      setErroRisco(false);
       buscarRisco(coIbge)
         .then((res) => setRisco(res.data))
-        .catch(() => setRisco(null))
+        .catch(() => { setRisco(null); setErroRisco(true); })
         .finally(() => setLoadingRisco(false));
 
       setLoadingHospitais(true);
+      setErroHospitais(false);
       buscarHospitais(coIbge, dados.condicao || 'dengue')
         .then((res) => setHospitais(res.data || []))
-        .catch(() => setHospitais([]))
+        .catch(() => { setHospitais([]); setErroHospitais(true); })
         .finally(() => setLoadingHospitais(false));
     }
   }, [dados, navigate]);
@@ -42,85 +59,134 @@ function Resultado() {
   if (!dados) return null;
 
   const perfil = dados.perfil || {};
-  const anoAtual = perfil.anoAtual || new Date().getFullYear();
-  const anoAnterior = anoAtual - 1;
+  const riscoData = risco || dados.risco || {};
+  const encaminhamento = dados.encaminhamento || {};
+
+  // Extrair dados do perfil com fallbacks
+  const municipioNome = dados.municipio?.nome || perfil.municipio || '';
+  const ufSigla = dados.municipio?.uf || perfil.uf || '';
+  const doencaNome = (dados.condicao || perfil.doenca || '').toUpperCase() || 'DENGUE';
+  const ano = perfil.ano || perfil.anoAtual || new Date().getFullYear();
+  const classificacao = (perfil.classificacao || '').toUpperCase();
+  const incidencia100k = perfil.incidencia100k;
+  const totalCasos = perfil.totalCasos;
+  const tendencia = perfil.tendencia || '';
+  const pressaoSus = perfil.pressaoSus || '';
+
+  const riscoClassificacao = (riscoData.classificacao || riscoData.nivel || '').toUpperCase();
+  const riscoScore = riscoData.score;
+  const previsao14Dias = riscoData.previsao14Dias || riscoData.previsao || [];
+  const tempMedia = riscoData.tempMedia || riscoData.temperatura;
+  const chuvaTotal = riscoData.chuvaTotal || riscoData.chuva;
+  const umidadeMedia = riscoData.umidadeMedia || riscoData.umidade;
+
+  const hospitaisList = hospitais.length > 0
+    ? hospitais
+    : encaminhamento.hospitais || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-sus-green text-white px-4 py-4 shadow">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+      {/* Nav */}
+      <nav className="bg-gray-900 text-white px-4 py-3">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-white hover:text-green-100 transition-colors"
+            className="flex items-center gap-2 hover:text-red-400 transition-colors"
           >
-            <span className="text-xl font-bold">VígiSUS</span>
+            <div className="w-7 h-7 bg-red-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-extrabold">V</span>
+            </div>
+            <span className="text-lg font-extrabold">VígiSUS</span>
           </button>
-          <p className="text-green-100 text-sm truncate max-w-xs md:max-w-none">
-            "{pergunta}"
-          </p>
+          {pergunta && (
+            <p className="text-gray-400 text-sm truncate max-w-xs hidden sm:block">
+              "{pergunta}"
+            </p>
+          )}
           <button
             onClick={() => navigate('/')}
-            className="text-green-100 hover:text-white text-sm underline"
+            className="text-gray-400 hover:text-white text-sm underline"
           >
             Nova busca
           </button>
         </div>
-      </header>
+      </nav>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {dados.municipio && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-            <h1 className="text-xl font-bold text-gray-900">
-              {dados.municipio.nome}
-              {dados.municipio.uf ? ` — ${dados.municipio.uf}` : ''}
-            </h1>
-            {dados.condicao && (
-              <p className="text-sus-blue font-medium capitalize">{dados.condicao}</p>
-            )}
+      {/* BLOCO 1 — Header de Alerta */}
+      <HeaderAlerta
+        municipio={municipioNome}
+        uf={ufSigla}
+        doenca={doencaNome}
+        ano={ano}
+        classificacao={classificacao}
+        incidencia100k={incidencia100k}
+        tendencia={tendencia}
+        pressaoSus={pressaoSus}
+      />
+
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        {/* BLOCO 2 — KPI Cards */}
+        <KpiCards
+          totalCasos={totalCasos}
+          incidencia100k={incidencia100k}
+          classificacao={classificacao}
+          riscoClassificacao={riscoClassificacao || undefined}
+          riscoScore={riscoScore}
+          ano={ano}
+        />
+
+        {/* BLOCO 3 — Gráfico Epidemiológico */}
+        <CurvaEpidemiologica
+          semanas={perfil.semanas}
+          semanasAnoAnterior={perfil.semanasAnoAnterior}
+          dadosAnoAtual={perfil.casosAnoAtual}
+          dadosAnoAnterior={perfil.casosAnoAnterior}
+          anoAtual={perfil.anoAtual || ano}
+          anoAnterior={perfil.anoAnterior || (Number(ano) - 1)}
+          doenca={doencaNome}
+          classificacao={classificacao}
+          ano={ano}
+        />
+
+        {/* BLOCO 4 — Risco Futuro */}
+        {loadingRisco ? (
+          <Skeleton height="h-40" label="previsão de risco" />
+        ) : erroRisco ? (
+          <div className="bg-gray-100 rounded-xl p-6 text-center text-gray-400">
+            Dados de previsão de risco temporariamente indisponíveis
           </div>
-        )}
-
-        {/* Bloco 1 — Texto IA */}
-        <TextoIa texto={dados.textoIa || dados.texto || dados.analise} />
-
-        {/* Bloco 2 — Curva Epidemiológica */}
-        {(perfil.casosAnoAtual || perfil.casosAnoAnterior) && (
-          <CurvaEpidemiologica
-            dadosAnoAtual={perfil.casosAnoAtual}
-            dadosAnoAnterior={perfil.casosAnoAnterior}
-            anoAtual={anoAtual}
-            anoAnterior={anoAnterior}
+        ) : (
+          <RiscoFuturo
+            previsao14Dias={previsao14Dias}
+            tempMedia={tempMedia}
+            chuvaTotal={chuvaTotal}
+            umidadeMedia={umidadeMedia}
           />
         )}
 
-        {/* Bloco 3 — Risco */}
-        {loadingRisco ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center text-gray-400">
-            Carregando previsão de risco...
-          </div>
-        ) : (
-          (risco || dados.risco) && (
-            <RiscoCard
-              score={(risco || dados.risco).score}
-              nivel={(risco || dados.risco).nivel}
-              fatores={(risco || dados.risco).fatores || []}
-            />
-          )
-        )}
-
-        {/* Bloco 4 — Mapa de Hospitais */}
+        {/* BLOCO 5 — Mapa + Hospitais */}
         {loadingHospitais ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center text-gray-400">
-            Carregando hospitais próximos...
+          <Skeleton height="h-64" label="hospitais" />
+        ) : erroHospitais && hospitaisList.length === 0 ? (
+          <div className="bg-gray-100 rounded-xl p-6 text-center text-gray-400">
+            Dados de hospitais temporariamente indisponíveis
           </div>
         ) : (
           <MapaHospitais
-            municipio={dados.municipio?.nome}
+            municipio={municipioNome}
             lat={dados.municipio?.lat}
             lng={dados.municipio?.lng}
-            hospitais={hospitais}
+            hospitais={hospitaisList}
           />
         )}
+
+        {/* BLOCO 6 — Resumo da IA */}
+        <ResumoIa
+          textoIa={dados.textoIa || dados.texto || dados.analise}
+          situacao={classificacao || undefined}
+          tendencia={tendencia || undefined}
+          riscoClimatico={riscoClassificacao || undefined}
+        />
       </main>
     </div>
   );
