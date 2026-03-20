@@ -18,6 +18,9 @@ public class EncaminhamentoResponse {
     private String tpLeito;
     private List<HospitalDTO> hospitais;
 
+    // Health system pressure calculated from estimated bed occupancy
+    private String pressaoSus;
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -30,5 +33,10 @@ public class EncaminhamentoResponse {
         private String nuTelefone;
         private int qtLeitosSus;
         private double distanciaKm;
+        private boolean servicoInfectologia;
+
+        // Geographic coordinates for map markers
+        private Double nuLatitude;
+        private Double nuLongitude;
     }
 }
