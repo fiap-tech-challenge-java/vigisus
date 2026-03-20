@@ -1,49 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import TextoIa from '../components/TextoIa';
 import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
-import RiscoCard from '../components/RiscoCard';
+import RiscoFuturo from '../components/RiscoFuturo';
 import MapaHospitais from '../components/MapaHospitais';
-import { buscarRisco, buscarHospitais } from '../services/api';
+import ResumoIa from '../components/ResumoIa';
+
+function mapHospital(h) {
+  return {
+    nome: h.noFantasia,
+    leitosSus: h.qtLeitosSus,
+    telefone: h.nuTelefone,
+    distanciaKm: h.distanciaKm,
+    servicoInfectologia: h.servicoInfectologia,
+    nuLatitude: h.nuLatitude,
+    nuLongitude: h.nuLongitude,
+  };
+}
 
 function Resultado() {
   const location = useLocation();
   const navigate = useNavigate();
   const { dados, pergunta } = location.state || {};
 
-  const [risco, setRisco] = useState(null);
-  const [hospitais, setHospitais] = useState([]);
-  const [loadingRisco, setLoadingRisco] = useState(false);
-  const [loadingHospitais, setLoadingHospitais] = useState(false);
-
-  useEffect(() => {
-    if (!dados) {
-      navigate('/');
-      return;
-    }
-
-    const coIbge = dados.coIbge || dados.municipio?.coIbge;
-
-    if (coIbge) {
-      setLoadingRisco(true);
-      buscarRisco(coIbge)
-        .then((res) => setRisco(res.data))
-        .catch(() => setRisco(null))
-        .finally(() => setLoadingRisco(false));
-
-      setLoadingHospitais(true);
-      buscarHospitais(coIbge, dados.condicao || 'dengue')
-        .then((res) => setHospitais(res.data || []))
-        .catch(() => setHospitais([]))
-        .finally(() => setLoadingHospitais(false));
-    }
-  }, [dados, navigate]);
-
-  if (!dados) return null;
+  if (!dados) {
+    navigate('/');
+    return null;
+  }
 
   const perfil = dados.perfil || {};
-  const anoAtual = perfil.anoAtual || new Date().getFullYear();
+  const interpretacao = dados.interpretacao || {};
+
+  // Map perfil fields to the shape expected by ResumoIa and MapaHospitais
+  const perfilMapped = {
+    ...perfil,
+    totalCasos: perfil.total,
+    incidencia100k: perfil.incidencia,
+  };
+
+  // Map encaminhamento hospitais to the shape expected by MapaHospitais
+  const encaminhamentoMapped = dados.encaminhamento ? {
+    ...dados.encaminhamento,
+    hospitais: (dados.encaminhamento.hospitais || []).map(mapHospital),
+  } : null;
+
+  const anoAtual = perfil.ano || new Date().getFullYear();
   const anoAnterior = anoAtual - 1;
+
+  const municipioNome = perfil.municipio || interpretacao.municipio;
+  const municipioUf = perfil.uf || interpretacao.uf;
+  const condicao = perfil.doenca || interpretacao.doenca;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -68,59 +73,36 @@ function Resultado() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {dados.municipio && (
+        {municipioNome && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
             <h1 className="text-xl font-bold text-gray-900">
-              {dados.municipio.nome}
-              {dados.municipio.uf ? ` — ${dados.municipio.uf}` : ''}
+              {municipioNome}
+              {municipioUf ? ` — ${municipioUf}` : ''}
             </h1>
-            {dados.condicao && (
-              <p className="text-sus-blue font-medium capitalize">{dados.condicao}</p>
+            {condicao && (
+              <p className="text-sus-blue font-medium capitalize">{condicao}</p>
             )}
           </div>
         )}
 
-        {/* Bloco 1 — Texto IA */}
-        <TextoIa texto={dados.textoIa || dados.texto || dados.analise} />
-
-        {/* Bloco 2 — Curva Epidemiológica */}
-        {(perfil.casosAnoAtual || perfil.casosAnoAnterior) && (
+        {/* Bloco 1 — Curva Epidemiológica */}
+        {(perfil.semanasAnoAnterior || perfil.casosAnoAtual) && (
           <CurvaEpidemiologica
             dadosAnoAtual={perfil.casosAnoAtual}
-            dadosAnoAnterior={perfil.casosAnoAnterior}
+            dadosAnoAnterior={perfil.casosAnoAnterior || perfil.semanasAnoAnterior}
             anoAtual={anoAtual}
             anoAnterior={anoAnterior}
           />
         )}
 
-        {/* Bloco 3 — Risco */}
-        {loadingRisco ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center text-gray-400">
-            Carregando previsão de risco...
-          </div>
-        ) : (
-          (risco || dados.risco) && (
-            <RiscoCard
-              score={(risco || dados.risco).score}
-              nivel={(risco || dados.risco).nivel}
-              fatores={(risco || dados.risco).fatores || []}
-            />
-          )
-        )}
+        {/* Bloco 2 — Risco 14 dias */}
+        <RiscoFuturo risco={dados.risco} />
 
-        {/* Bloco 4 — Mapa de Hospitais */}
-        {loadingHospitais ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center text-gray-400">
-            Carregando hospitais próximos...
-          </div>
-        ) : (
-          <MapaHospitais
-            municipio={dados.municipio?.nome}
-            lat={dados.municipio?.lat}
-            lng={dados.municipio?.lng}
-            hospitais={hospitais}
-          />
-        )}
+        {/* Bloco 3 — Mapa + lista de Hospitais */}
+        <MapaHospitais perfil={perfilMapped} encaminhamento={encaminhamentoMapped} />
+
+        {/* Bloco 4 — Resumo IA */}
+        <ResumoIa textoIa={dados.textoIa} perfil={perfilMapped} />
       </main>
     </div>
   );

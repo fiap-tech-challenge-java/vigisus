@@ -81,6 +81,8 @@ public class PerfilEpidemiologicoService {
                 .semanasAnoAnterior(semanasAnoAnterior)
                 .incidenciaMediaEstado(incidenciaMediaEstado)
                 .posicaoEstado(posicaoEstado)
+                .nuLatitude(municipio.getNuLatitude())
+                .nuLongitude(municipio.getNuLongitude())
                 .build();
     }
 
