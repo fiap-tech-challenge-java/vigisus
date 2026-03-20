@@ -1,5 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import HeaderAlerta from '../components/HeaderAlerta';
+import KpiCards from '../components/KpiCards';
 import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
 import RiscoFuturo from '../components/RiscoFuturo';
 import MapaHospitais from '../components/MapaHospitais';
@@ -43,15 +45,22 @@ function Resultado() {
     hospitais: (dados.encaminhamento.hospitais || []).map(mapHospital),
   } : null;
 
-  const anoAtual = perfil.ano || new Date().getFullYear();
-  const anoAnterior = anoAtual - 1;
-
   const municipioNome = perfil.municipio || interpretacao.municipio;
   const municipioUf = perfil.uf || interpretacao.uf;
   const condicao = perfil.doenca || interpretacao.doenca;
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* BLOCO 1 — Header colorido */}
+      <HeaderAlerta perfil={dados?.perfil} risco={dados?.risco} />
+
+      {/* BLOCO 2 — KPI Cards */}
+      <KpiCards perfil={dados?.perfil} risco={dados?.risco} />
+
+      {/* BLOCO 3 — Gráfico */}
+      <CurvaEpidemiologica perfil={dados?.perfil} />
+
       <header className="bg-sus-green text-white px-4 py-4 shadow">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <button
@@ -85,23 +94,13 @@ function Resultado() {
           </div>
         )}
 
-        {/* Bloco 1 — Curva Epidemiológica */}
-        {(perfil.semanasAnoAnterior || perfil.casosAnoAtual) && (
-          <CurvaEpidemiologica
-            dadosAnoAtual={perfil.casosAnoAtual}
-            dadosAnoAnterior={perfil.casosAnoAnterior || perfil.semanasAnoAnterior}
-            anoAtual={anoAtual}
-            anoAnterior={anoAnterior}
-          />
-        )}
-
-        {/* Bloco 2 — Risco 14 dias */}
+        {/* Risco 14 dias */}
         <RiscoFuturo risco={dados.risco} />
 
-        {/* Bloco 3 — Mapa + lista de Hospitais */}
+        {/* Mapa + lista de Hospitais */}
         <MapaHospitais perfil={perfilMapped} encaminhamento={encaminhamentoMapped} />
 
-        {/* Bloco 4 — Resumo IA */}
+        {/* Resumo IA */}
         <ResumoIa textoIa={dados.textoIa} perfil={perfilMapped} />
       </main>
     </div>
