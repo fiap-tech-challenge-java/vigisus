@@ -4,7 +4,7 @@ Insere dados mockados com estrutura real para uso em desenvolvimento local,
 quando o FTP do DATASUS não estiver acessível.
 
 Dados inseridos:
-  - 20 municípios (MG + SP)
+  - 21 municípios (MG + SP)
   - 1 hospital por cidade + 3 originais de Lavras
   - Leitos e serviços por hospital
   - Casos de dengue semanais para todos os municípios, anos 2021-2025
@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Dados de municípios — 20 cidades (MG + SP)
+# Dados de municípios — 21 cidades (MG + SP)
 # ---------------------------------------------------------------------------
 MUNICIPIOS = [
     # Minas Gerais
@@ -38,6 +38,7 @@ MUNICIPIOS = [
     {"id": 3136207, "co_ibge": "3136207", "no_municipio": "Governador Valadares", "sg_uf": "MG", "nu_latitude": -18.8514, "nu_longitude": -41.9494, "populacao": 281000},
     {"id": 3155504, "co_ibge": "3155504", "no_municipio": "Ribeirão das Neves",   "sg_uf": "MG", "nu_latitude": -19.7706, "nu_longitude": -44.0858, "populacao": 340000},
     {"id": 3163706, "co_ibge": "3163706", "no_municipio": "Varginha",             "sg_uf": "MG", "nu_latitude": -21.5512, "nu_longitude": -45.4302, "populacao": 135000},
+    {"id": 3131703, "co_ibge": "3131703", "no_municipio": "Ipatinga",             "sg_uf": "MG", "nu_latitude": -19.4683, "nu_longitude": -42.5364, "populacao": 262000},
     # São Paulo
     {"id": 3550308, "co_ibge": "3550308", "no_municipio": "São Paulo",            "sg_uf": "SP", "nu_latitude": -23.5505, "nu_longitude": -46.6333, "populacao": 12325000},
     {"id": 3509502, "co_ibge": "3509502", "no_municipio": "Campinas",             "sg_uf": "SP", "nu_latitude": -22.9056, "nu_longitude": -47.0608, "populacao": 1213000},
@@ -57,7 +58,8 @@ MUNICIPIOS = [
 _GRANDES = {"3106200", "3550308", "3509502"}
 # Hospitais médios: demais capitais e cidades > ~300k
 _MEDIOS = {"3170206", "3136702", "3143302", "3167202", "3122306", "3136207",
-           "3155504", "3548708", "3529401", "3518800", "3543402", "3557105"}
+           "3155504", "3548708", "3529401", "3518800", "3543402", "3557105",
+           "3131703"}
 
 ESTABELECIMENTOS = [
     # Originais de Lavras (sem campo id — SERIAL gera)
@@ -84,6 +86,7 @@ ESTABELECIMENTOS = [
     {"co_cnes": "9001017", "no_fantasia": "Hospital Regional Piracicaba",   "co_municipio": "3543402", "nu_latitude": -22.7253, "nu_longitude": -47.6492, "nu_telefone": "1900000017", "tp_gestao": "E", "competencia": "202312"},
     {"co_cnes": "9001018", "no_fantasia": "Hospital Regional Marília",      "co_municipio": "3525904", "nu_latitude": -22.2139, "nu_longitude": -49.9458, "nu_telefone": "1400000018", "tp_gestao": "M", "competencia": "202312"},
     {"co_cnes": "9001019", "no_fantasia": "Hospital Regional Sorocaba",     "co_municipio": "3557105", "nu_latitude": -23.5015, "nu_longitude": -47.4526, "nu_telefone": "1500000019", "tp_gestao": "E", "competencia": "202312"},
+    {"co_cnes": "9002001", "no_fantasia": "Hospital Municipal de Ipatinga", "co_municipio": "3131703", "nu_latitude": -19.4700, "nu_longitude": -42.5400, "nu_telefone": "3138291000", "tp_gestao": "M", "competencia": "202312"},
 ]
 
 # ---------------------------------------------------------------------------
@@ -146,6 +149,7 @@ BASE_CASOS = {
     "3136207": 35,   # Gov. Valadares
     "3155504": 40,   # Ribeirão das Neves
     "3163706": 18,   # Varginha
+    "3131703": 35,   # Ipatinga
     "3550308": 800,  # São Paulo
     "3509502": 120,  # Campinas
     "3548708": 85,   # Ribeirão Preto
