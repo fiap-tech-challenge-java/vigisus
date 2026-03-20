@@ -1,43 +1,31 @@
 package br.com.fiap.vigisus.config;
 
 import br.com.fiap.vigisus.service.IaService;
+import br.com.fiap.vigisus.service.IaServiceGeminiImpl;
 import br.com.fiap.vigisus.service.IaServiceFallback;
-import br.com.fiap.vigisus.service.IaServiceImpl;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
 
 @Slf4j
 @Configuration
 public class IaConfig {
 
-    @Value("${vigisus.ia.api-key:sk-fake-key-for-dev}")
+    @Value("${vigisus.ia.api-key:}")
     private String apiKey;
 
-    @Value("${vigisus.ia.model:gpt-4o-mini}")
+    @Value("${vigisus.ia.model:gemini-2.0-flash}")
     private String model;
 
-    @Value("${vigisus.ia.url:https://api.openai.com/v1/chat/completions}")
-    private String apiUrl;
-
-    @Value("${vigisus.ia.max-tokens:500}")
-    private int maxTokens;
-
-    @Value("${vigisus.ia.temperature:0.3}")
-    private double temperature;
-
-    private static final String FAKE_KEY_PREFIX = "sk-fake";
-
     @Bean
-    public IaService iaService(RestTemplate restTemplate, ObjectMapper objectMapper) {
-        if (apiKey != null && !apiKey.isEmpty() && !apiKey.startsWith(FAKE_KEY_PREFIX)) {
-            return new IaServiceImpl(apiKey, model, apiUrl, maxTokens, temperature,
-                    restTemplate, objectMapper);
+    public IaService iaService() {
+        if (apiKey != null && !apiKey.isBlank()) {
+            log.info("IaService: usando Gemini (modelo: {})", model);
+            return new IaServiceGeminiImpl(apiKey, model);
         }
-        log.warn("AVISO: OPENAI_API_KEY não configurada — usando fallback");
+        log.warn("IaService: GEMINI_API_KEY não configurada — usando fallback de texto");
+        log.warn("Para usar IA real: adicione GEMINI_API_KEY no .env");
         return new IaServiceFallback();
     }
 }
