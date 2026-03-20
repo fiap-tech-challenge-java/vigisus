@@ -1,95 +1,87 @@
-import React from 'react';
 import {
   Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
+  LineElement, PointElement, LinearScale, CategoryScale,
+  Filler, Tooltip, Legend
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+import { getCor } from "../utils/cores";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(LineElement, PointElement, LinearScale,
+  CategoryScale, Filler, Tooltip, Legend);
 
-function CurvaEpidemiologica({ dadosAnoAtual, dadosAnoAnterior, anoAtual, anoAnterior }) {
-  const semanas = Array.from({ length: 52 }, (_, i) => `SE ${i + 1}`);
+export default function CurvaEpidemiologica({ perfil }) {
+  if (!perfil?.semanas?.length) return null;
+
+  const cor = getCor(perfil.classificacao);
+  const semanas = Array.from({ length: 52 }, (_, i) => i + 1);
+
+  const casosPorSemana = (lista) => semanas.map(s => {
+    const found = lista?.find(x => x.semanaEpi === s);
+    return found ? found.casos : 0;
+  });
+
+  const casosAno      = casosPorSemana(perfil.semanas);
+  const casosAnterior = casosPorSemana(perfil.semanasAnoAnterior);
+
+  const pico = Math.max(...casosAno);
+  const semPico = casosAno.indexOf(pico) + 1;
 
   const data = {
-    labels: semanas,
+    labels: semanas.map(s => `Sem. ${s}`),
     datasets: [
       {
-        label: `${anoAtual || 'Ano atual'}`,
-        data: dadosAnoAtual || [],
-        borderColor: '#009EE3',
-        backgroundColor: 'rgba(0, 158, 227, 0.1)',
-        borderWidth: 2,
-        pointRadius: 3,
+        label: `${perfil.doenca} ${perfil.ano}`,
+        data: casosAno,
+        borderColor: cor.hex,
+        backgroundColor: cor.hex + "33",
+        fill: true,
         tension: 0.3,
+        pointRadius: casosAno.map((_, i) => i + 1 === semPico ? 6 : 2),
+        pointBackgroundColor: casosAno.map((_, i) =>
+          i + 1 === semPico ? cor.hex : cor.hex + "88"
+        ),
       },
-      {
-        label: `${anoAnterior || 'Ano anterior'}`,
-        data: dadosAnoAnterior || [],
-        borderColor: '#009C3B',
-        backgroundColor: 'rgba(0, 156, 59, 0.1)',
-        borderWidth: 2,
-        pointRadius: 3,
-        tension: 0.3,
+      ...(perfil.semanasAnoAnterior?.length ? [{
+        label: `${perfil.doenca} ${perfil.ano - 1}`,
+        data: casosAnterior,
+        borderColor: "#9CA3AF",
         borderDash: [5, 5],
-      },
+        backgroundColor: "transparent",
+        fill: false,
+        tension: 0.3,
+        pointRadius: 0,
+      }] : []),
     ],
   };
 
   const options = {
     responsive: true,
     plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: false,
-      },
+      legend: { position: "top" },
       tooltip: {
         callbacks: {
-          title: (items) => `Semana Epidemiológica ${items[0].dataIndex + 1}`,
+          afterLabel: (ctx) =>
+            ctx.dataIndex + 1 === semPico
+              ? `🔴 Pico da epidemia`
+              : "",
         },
       },
     },
     scales: {
-      x: {
-        title: {
-          display: true,
-          text: 'Semana Epidemiológica',
-        },
-        ticks: {
-          maxTicksLimit: 13,
-        },
-      },
-      y: {
-        title: {
-          display: true,
-          text: 'Número de Casos',
-        },
-        beginAtZero: true,
-      },
+      y: { beginAtZero: true, title: { display: true, text: "Casos" } },
+      x: { ticks: { maxTicksLimit: 13 } },
     },
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">📈 Curva Epidemiológica</h2>
+    <div className="bg-white rounded-xl shadow p-6 mx-6 max-w-6xl md:mx-auto">
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+        📈 Curva epidemiológica — {perfil.doenca} {perfil.ano}
+        <span className="ml-2 text-xs text-gray-400 normal-case">
+          Pico: {pico} casos na semana {semPico}
+        </span>
+      </h2>
       <Line data={data} options={options} />
     </div>
   );
 }
-
-export default CurvaEpidemiologica;
