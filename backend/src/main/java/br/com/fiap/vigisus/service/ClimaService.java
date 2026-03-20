@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoDailyData;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoResponse;
 import br.com.fiap.vigisus.exception.ApiExternaException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -14,6 +15,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClimaService {
@@ -23,7 +25,16 @@ public class ClimaService {
     private final RestTemplate restTemplate;
 
     @Cacheable(value = "clima-atual", key = "#lat + ',' + #lon")
-    public ClimaAtualDTO buscarClimaAtual(double lat, double lon) {
+    public ClimaAtualDTO buscarClimaAtual(Double lat, Double lon) {
+        if (lat == null || lon == null) {
+            log.warn("[ClimaService] Coordenadas nulas — não é possível buscar clima");
+            return null;
+        }
+        if (lat == 0.0 && lon == 0.0) {
+            log.warn("[ClimaService] Coordenadas zeradas (0,0) — provavelmente inválidas");
+            return null;
+        }
+
         String url = UriComponentsBuilder.fromHttpUrl(OPEN_METEO_URL)
                 .queryParam("latitude", lat)
                 .queryParam("longitude", lon)
@@ -43,7 +54,16 @@ public class ClimaService {
                 .build();
     }
 
-    public List<PrevisaoDiariaDTO> buscarPrevisao16Dias(double lat, double lon) {
+    public List<PrevisaoDiariaDTO> buscarPrevisao16Dias(Double lat, Double lon) {
+        if (lat == null || lon == null) {
+            log.warn("[ClimaService] Coordenadas nulas — não é possível buscar previsão");
+            return List.of();
+        }
+        if (lat == 0.0 && lon == 0.0) {
+            log.warn("[ClimaService] Coordenadas zeradas (0,0) — não é possível buscar previsão");
+            return List.of();
+        }
+
         String url = UriComponentsBuilder.fromHttpUrl(OPEN_METEO_URL)
                 .queryParam("latitude", lat)
                 .queryParam("longitude", lon)

@@ -11,10 +11,9 @@ import br.com.fiap.vigisus.repository.ServicoEspecializadoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,56 +31,62 @@ public class EncaminhamentoService {
     public EncaminhamentoResponse buscarHospitais(String coIbge, String tpLeito, int minLeitosSus) {
         Municipio origem = municipioService.buscarPorCoIbge(coIbge);
 
-        // Step 1: CNES codes with infectious disease services
-        Set<String> cnesComServico = servicoEspecializadoRepository
-                .findDistinctCoCnesByServEspIn(SERVICOS_INFECCIOSAS);
+        double lat = origem.getNuLatitude();
+        double lon = origem.getNuLongitude();
 
-        if (cnesComServico.isEmpty()) {
-            return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, List.of());
+        // Try expanding radii: 0 = no distance filter, then 50/150/300 km
+        int[] raiosKm = {0, 50, 150, 300};
+        List<HospitalDTO> resultados = new ArrayList<>();
+
+        for (int raio : raiosKm) {
+            resultados = buscarHospitaisNoRaio(lat, lon, tpLeito, minLeitosSus, raio);
+            if (resultados.size() >= 1) break;
         }
 
-        // Step 2: Leitos matching bed type and minimum SUS quantity
+        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, resultados);
+    }
+
+    private List<HospitalDTO> buscarHospitaisNoRaio(double lat, double lon,
+                                                     String tpLeito, int minLeitosSus,
+                                                     int raioKm) {
         List<Leito> leitos = leitoRepository
-                .findByCoCnesInAndTpLeitoAndQtSusGreaterThanEqual(cnesComServico, tpLeito, minLeitosSus);
+                .findByTpLeitoAndQtSusGreaterThanEqual(tpLeito, minLeitosSus);
 
-        if (leitos.isEmpty()) {
-            return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, List.of());
+        List<HospitalDTO> resultado = new ArrayList<>();
+
+        for (Leito leito : leitos) {
+            Estabelecimento est = estabelecimentoRepository
+                    .findByCoCnes(leito.getCoCnes()).orElse(null);
+
+            if (est == null || est.getNuLatitude() == null || est.getNuLongitude() == null) continue;
+
+            double distancia = haversine(lat, lon, est.getNuLatitude(), est.getNuLongitude());
+
+            // raioKm == 0 means no distance filter (accept all)
+            if (raioKm > 0 && distancia > raioKm) continue;
+
+            boolean temInfecciosas = servicoEspecializadoRepository
+                    .findByCoCnes(leito.getCoCnes())
+                    .stream()
+                    .anyMatch(s -> SERVICOS_INFECCIOSAS.contains(s.getServEsp()));
+
+            resultado.add(HospitalDTO.builder()
+                    .coCnes(est.getCoCnes())
+                    .noFantasia(est.getNoFantasia())
+                    .coMunicipio(est.getCoMunicipio())
+                    .nuTelefone(est.getNuTelefone())
+                    .qtLeitosSus(leito.getQtSus() != null ? leito.getQtSus() : 0)
+                    .distanciaKm(distancia)
+                    .servicoInfectologia(temInfecciosas)
+                    .build());
         }
 
-        // Map coCnes → qtSus (pick max in case of duplicates)
-        Map<String, Integer> cnesParaQtSus = leitos.stream()
-                .collect(Collectors.toMap(
-                        Leito::getCoCnes,
-                        Leito::getQtSus,
-                        Integer::max));
-
-        // Step 3: Find establishments for those CNES codes
-        List<Estabelecimento> estabelecimentos = estabelecimentoRepository
-                .findByCoCnesIn(cnesParaQtSus.keySet());
-
-        double latOrigem = origem.getNuLatitude();
-        double lonOrigem = origem.getNuLongitude();
-
-        // Step 4: Build response with distances, sorted ascending
-        List<HospitalDTO> hospitais = estabelecimentos.stream()
-                .filter(e -> e.getNuLatitude() != null && e.getNuLongitude() != null)
-                .map(e -> HospitalDTO.builder()
-                        .coCnes(e.getCoCnes())
-                        .noFantasia(e.getNoFantasia())
-                        .coMunicipio(e.getCoMunicipio())
-                        .nuTelefone(e.getNuTelefone())
-                        .qtLeitosSus(cnesParaQtSus.getOrDefault(e.getCoCnes(), 0))
-                        .distanciaKm(haversine(latOrigem, lonOrigem,
-                                e.getNuLatitude(), e.getNuLongitude()))
-                        .build())
-                .sorted(Comparator.comparingDouble(HospitalDTO::getDistanciaKm))
-                .collect(Collectors.toList());
-
-        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, hospitais);
+        resultado.sort(Comparator.comparingDouble(HospitalDTO::getDistanciaKm));
+        return resultado.stream().limit(5).collect(Collectors.toList());
     }
 
     private EncaminhamentoResponse buildResponse(String coIbge, String municipioOrigem,
-                                                  String tpLeito, List<HospitalDTO> hospitais) {
+                                                   String tpLeito, List<HospitalDTO> hospitais) {
         return EncaminhamentoResponse.builder()
                 .coIbge(coIbge)
                 .municipioOrigem(municipioOrigem)

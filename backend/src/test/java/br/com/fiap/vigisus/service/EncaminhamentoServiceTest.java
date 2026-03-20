@@ -17,7 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -87,13 +87,10 @@ class EncaminhamentoServiceTest {
                 .build();
 
         when(municipioService.buscarPorCoIbge("3131307")).thenReturn(lavras);
-        when(servicoEspecializadoRepository.findDistinctCoCnesByServEspIn(any()))
-                .thenReturn(Set.of("CNES001", "CNES002"));
 
         Leito leito1 = Leito.builder().coCnes("CNES001").tpLeito("81").qtSus(5).build();
         Leito leito2 = Leito.builder().coCnes("CNES002").tpLeito("81").qtSus(3).build();
-        when(leitoRepository.findByCoCnesInAndTpLeitoAndQtSusGreaterThanEqual(
-                any(), eq("81"), anyInt()))
+        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("81"), anyInt()))
                 .thenReturn(List.of(leito1, leito2));
 
         // Hospital farther away (Varginha ~98 km)
@@ -114,8 +111,12 @@ class EncaminhamentoServiceTest {
                 .nuLongitude(-45.010)
                 .build();
 
-        when(estabelecimentoRepository.findByCoCnesIn(any()))
-                .thenReturn(List.of(hospVarginha, hospLavras));
+        when(estabelecimentoRepository.findByCoCnes("CNES001"))
+                .thenReturn(Optional.of(hospVarginha));
+        when(estabelecimentoRepository.findByCoCnes("CNES002"))
+                .thenReturn(Optional.of(hospLavras));
+        when(servicoEspecializadoRepository.findByCoCnes(any()))
+                .thenReturn(List.of());
 
         EncaminhamentoResponse response = service.buscarHospitais("3131307", "81", 1);
 

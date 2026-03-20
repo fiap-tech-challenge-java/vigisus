@@ -5,12 +5,14 @@ import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.model.Municipio;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PrevisaoRiscoService {
@@ -22,8 +24,20 @@ public class PrevisaoRiscoService {
     public PrevisaoRiscoResponse calcularRisco(String coIbge) {
         Municipio municipio = municipioService.buscarPorCoIbge(coIbge);
 
-        double lat = municipio.getNuLatitude();
-        double lon = municipio.getNuLongitude();
+        Double lat = municipio.getNuLatitude();
+        Double lon = municipio.getNuLongitude();
+
+        log.info("[PrevisaoRisco] Município: {} | lat={} | lon={}",
+                municipio.getNoMunicipio(), lat, lon);
+
+        if (lat == null || lon == null || (lat == 0.0 && lon == 0.0)) {
+            log.warn("[PrevisaoRisco] Coordenadas inválidas para {} — " +
+                     "usando coordenadas padrão do estado {}",
+                     coIbge, municipio.getSgUf());
+            double[] coordEstado = getCentroideEstado(municipio.getSgUf());
+            lat = coordEstado[0];
+            lon = coordEstado[1];
+        }
 
         ClimaAtualDTO climaAtual = climaService.buscarClimaAtual(lat, lon);
         List<PrevisaoDiariaDTO> previsao16Dias = climaService.buscarPrevisao16Dias(lat, lon);
@@ -32,7 +46,8 @@ public class PrevisaoRiscoService {
         int score = 0;
 
         // Temperatura atual
-        double tempAtual = climaAtual.getTemperatura() != null ? climaAtual.getTemperatura() : 0.0;
+        double tempAtual = (climaAtual != null && climaAtual.getTemperatura() != null)
+                ? climaAtual.getTemperatura() : 0.0;
         if (tempAtual >= 28) {
             score += 2;
             fatores.add("Temperatura atual ≥ 28°C (" + tempAtual + "°C)");
@@ -42,7 +57,8 @@ public class PrevisaoRiscoService {
         }
 
         // Umidade atual
-        int umidade = climaAtual.getUmidade() != null ? climaAtual.getUmidade() : 0;
+        int umidade = (climaAtual != null && climaAtual.getUmidade() != null)
+                ? climaAtual.getUmidade() : 0;
         if (umidade >= 80) {
             score += 1;
             fatores.add("Umidade relativa ≥ 80% (" + umidade + "%)");
@@ -109,5 +125,23 @@ public class PrevisaoRiscoService {
         } else {
             return "MUITO_ALTO";
         }
+    }
+
+    // Coordenadas dos centroides dos estados (fallback)
+    private double[] getCentroideEstado(String sgUf) {
+        if (sgUf == null) return new double[]{-15.7801, -47.9292};
+        return switch (sgUf) {
+            case "MG" -> new double[]{-18.5122, -44.5550};
+            case "SP" -> new double[]{-22.1875, -48.7966};
+            case "RJ" -> new double[]{-22.2500, -42.6667};
+            case "ES" -> new double[]{-19.1834, -40.3089};
+            case "BA" -> new double[]{-12.5797, -41.7007};
+            case "GO" -> new double[]{-15.9670, -49.8319};
+            case "DF" -> new double[]{-15.7217, -47.9292};
+            case "PR" -> new double[]{-24.8900, -51.5550};
+            case "SC" -> new double[]{-27.2423, -50.2189};
+            case "RS" -> new double[]{-30.0346, -51.2177};
+            default   -> new double[]{-15.7801, -47.9292}; // Brasília como último fallback
+        };
     }
 }

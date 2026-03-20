@@ -16,6 +16,7 @@ import br.com.fiap.vigisus.service.PrevisaoRiscoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/busca")
 @Tag(name = "Busca por Linguagem Natural")
@@ -83,13 +85,29 @@ public class BuscaController {
                     try {
                         return previsaoRiscoService.calcularRisco(coIbge);
                     } catch (Exception e) {
-                        return null;
+                        log.warn("[Busca] Risco climático indisponível para {}: {}", coIbge, e.getMessage());
+                        return PrevisaoRiscoResponse.builder()
+                                .municipio(municipio.getNoMunicipio())
+                                .score(0)
+                                .classificacao("INDISPONÍVEL")
+                                .fatores(List.of("Dados climáticos temporariamente indisponíveis"))
+                                .textoIa("Previsão climática não disponível no momento.")
+                                .build();
                     }
                 });
 
         CompletableFuture<EncaminhamentoResponse> futureEncaminhamento =
-                CompletableFuture.supplyAsync(() ->
-                        encaminhamentoService.buscarHospitais(coIbge, TP_LEITO_CLINICO, MIN_HOSPITAIS));
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return encaminhamentoService.buscarHospitais(coIbge, TP_LEITO_CLINICO, MIN_HOSPITAIS);
+                    } catch (Exception e) {
+                        log.warn("[Busca] Encaminhamento falhou para {}: {}", coIbge, e.getMessage());
+                        return EncaminhamentoResponse.builder()
+                                .municipioOrigem(municipio.getNoMunicipio())
+                                .hospitais(List.of())
+                                .build();
+                    }
+                });
 
         CompletableFuture.allOf(futurePerfil, futureRisco, futureEncaminhamento).join();
 
