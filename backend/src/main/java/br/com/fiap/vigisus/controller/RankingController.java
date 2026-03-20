@@ -23,7 +23,18 @@ public class RankingController {
     private final RankingService rankingService;
 
     @GetMapping
-    @Operation(summary = "Retorna ranking de municípios por incidência de dengue por 100 mil habitantes")
+    @Operation(
+            summary = "Ranking municipal por incidência",
+            description = """
+                    Retorna municípios ordenados por incidência de dengue por
+                    100 mil habitantes. Útil para identificar regiões de maior
+                    pressão epidemiológica.
+
+                    Fontes: SINAN (casos), IBGE (população estimada).
+                    Retorna contexto informacional baseado em dados públicos do SUS.
+                    Não realiza diagnóstico, triagem clínica nem define conduta médica.
+                    A decisão final permanece com o profissional de saúde habilitado.
+                    """)
     public RankingResponse getRanking(
             @RequestParam String uf,
             @RequestParam(defaultValue = "dengue") String doenca,
