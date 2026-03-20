@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 MUNICIPIOS = [
     {
+        "id": 3131307,
         "co_ibge": "3131307",
         "no_municipio": "Lavras",
         "sg_uf": "MG",
@@ -32,6 +33,7 @@ MUNICIPIOS = [
         "populacao": 105000,
     },
     {
+        "id": 3106200,
         "co_ibge": "3106200",
         "no_municipio": "Belo Horizonte",
         "sg_uf": "MG",
@@ -40,6 +42,7 @@ MUNICIPIOS = [
         "populacao": 2722000,
     },
     {
+        "id": 3170206,
         "co_ibge": "3170206",
         "no_municipio": "Uberlândia",
         "sg_uf": "MG",
@@ -48,6 +51,7 @@ MUNICIPIOS = [
         "populacao": 706597,
     },
     {
+        "id": 3143302,
         "co_ibge": "3143302",
         "no_municipio": "Montes Claros",
         "sg_uf": "MG",
@@ -56,6 +60,7 @@ MUNICIPIOS = [
         "populacao": 414649,
     },
     {
+        "id": 3152501,
         "co_ibge": "3152501",
         "no_municipio": "Pouso Alegre",
         "sg_uf": "MG",
@@ -70,27 +75,30 @@ MUNICIPIOS = [
 # ---------------------------------------------------------------------------
 ESTABELECIMENTOS = [
     {
+        "id": 2078023,
         "co_cnes": "2078023",
         "no_fantasia": "Hospital Universitário UFLA",
-        "co_municipio_gestor": "3131307",
+        "co_municipio": "3131307",
         "nu_latitude": -21.2430,
         "nu_longitude": -44.9870,
         "nu_telefone": "3514050000",
         "tp_gestao": "M",
     },
     {
+        "id": 2078015,
         "co_cnes": "2078015",
         "no_fantasia": "Santa Casa de Lavras",
-        "co_municipio_gestor": "3131307",
+        "co_municipio": "3131307",
         "nu_latitude": -21.2489,
         "nu_longitude": -45.0010,
         "nu_telefone": "3514060000",
         "tp_gestao": "M",
     },
     {
+        "id": 2000000,
         "co_cnes": "2000000",
         "no_fantasia": "UPA Lavras Norte",
-        "co_municipio_gestor": "3131307",
+        "co_municipio": "3131307",
         "nu_latitude": -21.2300,
         "nu_longitude": -44.9900,
         "nu_telefone": "3514070000",
@@ -103,42 +111,42 @@ ESTABELECIMENTOS = [
 # ---------------------------------------------------------------------------
 LEITOS = [
     {
-        "cnes": "2078023",
-        "codufmun": "313130",
-        "codleito": "74",
-        "dsleito": "CIRÚRGICO",
+        "id": 1,
+        "co_cnes": "2078023",
+        "tp_leito": "74",
+        "ds_leito": "CIRÚRGICO",
         "qt_exist": 30,
         "qt_sus": 25,
     },
     {
-        "cnes": "2078023",
-        "codufmun": "313130",
-        "codleito": "01",
-        "dsleito": "CLÍNICO",
+        "id": 2,
+        "co_cnes": "2078023",
+        "tp_leito": "01",
+        "ds_leito": "CLÍNICO",
         "qt_exist": 50,
         "qt_sus": 45,
     },
     {
-        "cnes": "2078015",
-        "codufmun": "313130",
-        "codleito": "74",
-        "dsleito": "CIRÚRGICO",
+        "id": 3,
+        "co_cnes": "2078015",
+        "tp_leito": "74",
+        "ds_leito": "CIRÚRGICO",
         "qt_exist": 20,
         "qt_sus": 18,
     },
     {
-        "cnes": "2078015",
-        "codufmun": "313130",
-        "codleito": "01",
-        "dsleito": "CLÍNICO",
+        "id": 4,
+        "co_cnes": "2078015",
+        "tp_leito": "01",
+        "ds_leito": "CLÍNICO",
         "qt_exist": 40,
         "qt_sus": 38,
     },
     {
-        "cnes": "2000000",
-        "codufmun": "313130",
-        "codleito": "02",
-        "dsleito": "URGÊNCIA",
+        "id": 5,
+        "co_cnes": "2000000",
+        "tp_leito": "02",
+        "ds_leito": "URGÊNCIA",
         "qt_exist": 10,
         "qt_sus": 10,
     },
@@ -148,10 +156,10 @@ LEITOS = [
 # Serviços especializados
 # ---------------------------------------------------------------------------
 SERVICOS = [
-    {"cnes": "2078023", "serv_esp": "135", "class_sr": "001"},
-    {"cnes": "2078023", "serv_esp": "040", "class_sr": "002"},
-    {"cnes": "2078015", "serv_esp": "135", "class_sr": "001"},
-    {"cnes": "2000000", "serv_esp": "118", "class_sr": "001"},
+    {"id": 1, "co_cnes": "2078023", "serv_esp": "135", "class_sr": "001"},
+    {"id": 2, "co_cnes": "2078023", "serv_esp": "040", "class_sr": "002"},
+    {"id": 3, "co_cnes": "2078015", "serv_esp": "135", "class_sr": "001"},
+    {"id": 4, "co_cnes": "2000000", "serv_esp": "118", "class_sr": "001"},
 ]
 
 # ---------------------------------------------------------------------------
@@ -161,6 +169,7 @@ SERVICOS = [
 random.seed(42)
 
 CASOS_DENGUE = []
+_caso_id = 1
 for year in [2023, 2024]:
     for semana in range(1, 53):
         # Simula sazonalidade: pico nas semanas 1-15 e 45-52
@@ -170,12 +179,14 @@ for year in [2023, 2024]:
             casos = random.randint(2, 30)
         CASOS_DENGUE.append(
             {
+                "id": _caso_id,
                 "co_municipio": "3131307",
                 "ano": year,
-                "semana_epidemiologica": semana,
+                "semana_epi": semana,
                 "total_casos": casos,
             }
         )
+        _caso_id += 1
 
 
 # ---------------------------------------------------------------------------
@@ -186,15 +197,16 @@ def seed_municipios(conn) -> int:
     sql = text(
         """
         INSERT INTO municipios
-            (co_ibge, no_municipio, sg_uf, nu_latitude, nu_longitude, populacao)
+            (id, co_ibge, no_municipio, sg_uf, nu_latitude, nu_longitude, populacao)
         VALUES
-            (:co_ibge, :no_municipio, :sg_uf, :nu_latitude, :nu_longitude, :populacao)
+            (:id, :co_ibge, :no_municipio, :sg_uf, :nu_latitude, :nu_longitude, :populacao)
         ON CONFLICT (co_ibge) DO UPDATE
             SET no_municipio = EXCLUDED.no_municipio,
                 sg_uf        = EXCLUDED.sg_uf,
                 nu_latitude  = EXCLUDED.nu_latitude,
                 nu_longitude = EXCLUDED.nu_longitude,
-                populacao    = EXCLUDED.populacao
+                populacao    = EXCLUDED.populacao,
+                id           = EXCLUDED.id
         """
     )
     conn.execute(sql, MUNICIPIOS)
@@ -205,18 +217,19 @@ def seed_estabelecimentos(conn) -> int:
     sql = text(
         """
         INSERT INTO estabelecimentos
-            (co_cnes, no_fantasia, co_municipio_gestor,
+            (id, co_cnes, no_fantasia, co_municipio,
              nu_latitude, nu_longitude, nu_telefone, tp_gestao)
         VALUES
-            (:co_cnes, :no_fantasia, :co_municipio_gestor,
+            (:id, :co_cnes, :no_fantasia, :co_municipio,
              :nu_latitude, :nu_longitude, :nu_telefone, :tp_gestao)
         ON CONFLICT (co_cnes) DO UPDATE
             SET no_fantasia         = EXCLUDED.no_fantasia,
-                co_municipio_gestor = EXCLUDED.co_municipio_gestor,
+                co_municipio        = EXCLUDED.co_municipio,
                 nu_latitude         = EXCLUDED.nu_latitude,
                 nu_longitude        = EXCLUDED.nu_longitude,
                 nu_telefone         = EXCLUDED.nu_telefone,
-                tp_gestao           = EXCLUDED.tp_gestao
+                tp_gestao           = EXCLUDED.tp_gestao,
+                id                  = EXCLUDED.id
         """
     )
     conn.execute(sql, ESTABELECIMENTOS)
@@ -226,11 +239,12 @@ def seed_estabelecimentos(conn) -> int:
 def seed_leitos(conn) -> int:
     sql = text(
         """
-        INSERT INTO leitos (cnes, codufmun, codleito, dsleito, qt_exist, qt_sus)
-        VALUES (:cnes, :codufmun, :codleito, :dsleito, :qt_exist, :qt_sus)
-        ON CONFLICT (cnes, codleito) DO UPDATE
-            SET codufmun = EXCLUDED.codufmun,
-                dsleito  = EXCLUDED.dsleito,
+        INSERT INTO leitos (id, co_cnes, tp_leito, ds_leito, qt_exist, qt_sus)
+        VALUES (:id, :co_cnes, :tp_leito, :ds_leito, :qt_exist, :qt_sus)
+        ON CONFLICT (id) DO UPDATE
+            SET co_cnes = EXCLUDED.co_cnes,
+                tp_leito = EXCLUDED.tp_leito,
+                ds_leito = EXCLUDED.ds_leito,
                 qt_exist = EXCLUDED.qt_exist,
                 qt_sus   = EXCLUDED.qt_sus
         """
@@ -242,10 +256,12 @@ def seed_leitos(conn) -> int:
 def seed_servicos(conn) -> int:
     sql = text(
         """
-        INSERT INTO servicos_especializados (cnes, serv_esp, class_sr)
-        VALUES (:cnes, :serv_esp, :class_sr)
-        ON CONFLICT (cnes, serv_esp) DO UPDATE
-            SET class_sr = EXCLUDED.class_sr
+        INSERT INTO servicos_especializados (id, co_cnes, serv_esp, class_sr)
+        VALUES (:id, :co_cnes, :serv_esp, :class_sr)
+        ON CONFLICT (id) DO UPDATE
+            SET co_cnes  = EXCLUDED.co_cnes,
+                serv_esp = EXCLUDED.serv_esp,
+                class_sr = EXCLUDED.class_sr
         """
     )
     conn.execute(sql, SERVICOS)
@@ -256,11 +272,12 @@ def seed_casos_dengue(conn) -> int:
     sql = text(
         """
         INSERT INTO casos_dengue
-            (co_municipio, ano, semana_epidemiologica, total_casos)
+            (id, co_municipio, ano, semana_epi, total_casos)
         VALUES
-            (:co_municipio, :ano, :semana_epidemiologica, :total_casos)
-        ON CONFLICT (co_municipio, ano, semana_epidemiologica) DO UPDATE
-            SET total_casos = EXCLUDED.total_casos
+            (:id, :co_municipio, :ano, :semana_epi, :total_casos)
+        ON CONFLICT (co_municipio, ano, semana_epi) DO UPDATE
+            SET total_casos = EXCLUDED.total_casos,
+                id          = EXCLUDED.id
         """
     )
     conn.execute(sql, CASOS_DENGUE)

@@ -9,10 +9,14 @@ Uso:
 """
 
 import sys
+import urllib3
 
 # Garante que o diretório pai (data-pipeline/) está no path
 import os
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Suprimir avisos de certificado SSL não verificado
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from clients import ibge_client, openmeteo_client, opendatasus_client, datasus_ftp_client
 
@@ -46,8 +50,10 @@ def _teste_ibge_municipio():
 # ── Teste 2 ─────────────────────────────────────────────────────────────────
 def _teste_ibge_populacao():
     pop = ibge_client.get_populacao(_CO_IBGE_LAVRAS, 2023)
-    if pop:
+    if pop is not None:
         return f"população={pop:,}"
+    if ibge_client.sidra_disponivel(2023):
+        return "endpoint SIDRA acessível (sem dado para o município/ano informado)"
     return None
 
 

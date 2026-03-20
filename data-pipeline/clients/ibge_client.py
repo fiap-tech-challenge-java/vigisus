@@ -6,8 +6,12 @@ Fornece dados de municípios, populações estimadas e coordenadas geográficas.
 
 import logging
 import time
+from typing import TYPE_CHECKING
 
-import requests
+from .requests_config import session
+
+if TYPE_CHECKING:
+    import requests
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +21,14 @@ _MAX_RETRIES = 3
 _BACKOFF = 2
 
 
-def _get(url: str, params: dict = None) -> requests.Response | None:
+def _get(url: str, params: dict = None) -> "requests.Response | None":
     """Executa GET com retry automático (3x, backoff 2s)."""
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
-            response = requests.get(url, params=params, timeout=_TIMEOUT)
+            response = session.get(url, params=params, timeout=_TIMEOUT)
             response.raise_for_status()
             return response
-        except requests.RequestException as exc:
+        except Exception as exc:
             logger.error("Tentativa %d/%d falhou para %s: %s", attempt, _MAX_RETRIES, url, exc)
             if attempt < _MAX_RETRIES:
                 time.sleep(_BACKOFF)
@@ -96,26 +100,54 @@ def get_populacao(co_ibge: str, ano: int = 2023) -> int | None:
     :param ano: Ano da estimativa (padrão 2023).
     :return: População estimada como int ou None em caso de erro.
     """
-    url = (
-        f"{BASE_URL}/api/v3/agregados/6579/periodos/{ano}/variaveis/9324"
-    )
+    url = f"{BASE_URL}/api/v3/agregados/6579/periodos/{ano}/variaveis/9324"
     params = {"localidades": f"N6[{co_ibge}]"}
     response = _get(url, params=params)
     if response is None:
         return None
     try:
         data = response.json()
-        valor = (
-            data[0]
-            .get("resultados", [{}])[0]
-            .get("series", [{}])[0]
-            .get("serie", {})
-            .get(str(ano))
-        )
-        return int(valor) if valor and valor != "-" else None
+        if not data:
+            return None
+
+        # Formato 1: resultados -> series -> serie[ano]
+        for variavel in data:
+            for resultado in variavel.get("resultados", []):
+                for serie in resultado.get("series", []):
+                    localidade = serie.get("localidade", {})
+                    if str(localidade.get("id", "")) == str(co_ibge):
+                        valor = serie.get("serie", {}).get(str(ano))
+                        if valor and valor != "-":
+                            return int(valor)
+
+        # Formato 2: resultados -> localidades -> series[0].serie[ano]
+        for variavel in data:
+            for resultado in variavel.get("resultados", []):
+                for localidade in resultado.get("localidades", []):
+                    if str(localidade.get("id", "")) != str(co_ibge):
+                        continue
+                    for serie in localidade.get("series", []):
+                        valor = serie.get("serie", {}).get(str(ano))
+                        if valor and valor != "-":
+                            return int(valor)
+
+        return None
     except Exception as exc:
         logger.error("Erro ao obter população de %s (%d): %s", co_ibge, ano, exc)
         return None
+
+
+def sidra_disponivel(ano: int = 2023) -> bool:
+    """
+    Verifica se o endpoint do SIDRA responde para o agregado de população.
+
+    Considera o serviço disponível quando a resposta HTTP é bem-sucedida,
+    mesmo que sem dados para uma localidade específica.
+    """
+    url = f"{BASE_URL}/api/v3/agregados/6579/periodos/{ano}/variaveis/9324"
+    params = {"localidades": "N6[3131307]"}
+    response = _get(url, params=params)
+    return response is not None
 
 
 def get_coordenadas(co_ibge: str) -> tuple[float | None, float | None]:

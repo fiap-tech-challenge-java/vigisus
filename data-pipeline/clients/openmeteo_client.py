@@ -6,7 +6,7 @@ Fornece clima atual, previsão de 16 dias e histórico climático.
 
 import logging
 
-import requests
+from .requests_config import session
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def _get(path: str, params: dict) -> dict | None:
     """Executa GET e retorna JSON ou None com log de erro."""
     url = f"{_BASE_URL}{path}"
     try:
-        response = requests.get(url, params=params, timeout=_TIMEOUT)
+        response = session.get(url, params=params, timeout=_TIMEOUT)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as exc:
@@ -126,7 +126,7 @@ def get_historico_climatico(
     # O endpoint de arquivo histórico é /archive, não /forecast
     url = "https://archive-api.open-meteo.com/v1/archive"
     try:
-        response = requests.get(url, params=params, timeout=_TIMEOUT)
+        response = session.get(url, params=params, timeout=_TIMEOUT)
         response.raise_for_status()
         data = response.json()
     except requests.RequestException as exc:

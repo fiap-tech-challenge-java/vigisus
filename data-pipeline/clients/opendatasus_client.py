@@ -6,14 +6,48 @@ Permite pesquisar datasets, listar recursos CSV e fazer download de arquivos gra
 
 import logging
 import os
+import re
+import urllib.parse
 
-import requests
+from .requests_config import session
 
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://dadosabertos.saude.gov.br/api/3/action"
+_BASE_URL_PORTAL = "https://dadosabertos.saude.gov.br"
 _TIMEOUT = 30
 _CHUNK_SIZE = 8192
+
+
+def _listar_datasets_via_portal(query: str = "dengue") -> list[dict]:
+    """Fallback: busca títulos na página web do portal quando API CKAN não está disponível."""
+    url = f"{_BASE_URL_PORTAL}/dataset?{urllib.parse.urlencode({'q': query})}"
+    try:
+        response = session.get(url, timeout=_TIMEOUT)
+        response.raise_for_status()
+        html = response.text
+    except Exception as exc:
+        logger.error("OpenDataSUS indisponível (fallback portal): %s", exc)
+        return []
+
+    # O portal renderiza metadados no HTML; extraímos títulos de forma resiliente.
+    titulos = re.findall(r'"title":"([^"\\]*(?:\\.[^"\\]*)*)"', html)
+    filtrados = []
+    q = query.lower().strip()
+    for t in titulos:
+        titulo = t.replace('\\"', '"').strip()
+        if not titulo:
+            continue
+        if q and q not in titulo.lower():
+            continue
+        filtrados.append(titulo)
+
+    # Remove duplicados preservando ordem.
+    unicos = list(dict.fromkeys(filtrados))
+    return [
+        {"titulo": titulo, "atualizado_em": "", "recursos": []}
+        for titulo in unicos[:5]
+    ]
 
 
 def listar_datasets(query: str = "dengue") -> list[dict]:
@@ -26,12 +60,15 @@ def listar_datasets(query: str = "dengue") -> list[dict]:
     url = f"{_BASE_URL}/package_search"
     params = {"q": query, "rows": 5}
     try:
-        response = requests.get(url, params=params, timeout=_TIMEOUT)
+        response = session.get(url, params=params, timeout=_TIMEOUT)
+        if response.status_code == 404:
+            logger.warning("CKAN API retornou 404; usando fallback do portal web")
+            return _listar_datasets_via_portal(query)
         response.raise_for_status()
         data = response.json()
-    except requests.RequestException as exc:
+    except Exception as exc:
         logger.error("OpenDataSUS indisponível (listar_datasets): %s", exc)
-        return []
+        return _listar_datasets_via_portal(query)
 
     try:
         results = data.get("result", {}).get("results", [])
@@ -50,10 +87,12 @@ def listar_datasets(query: str = "dengue") -> list[dict]:
                 "atualizado_em": pkg.get("metadata_modified", ""),
                 "recursos": recursos,
             })
-        return datasets
+        if datasets:
+            return datasets
+        return _listar_datasets_via_portal(query)
     except Exception as exc:
         logger.error("Erro ao parsear datasets: %s", exc)
-        return []
+        return _listar_datasets_via_portal(query)
 
 
 def listar_recursos_csv(dataset_id: str) -> list[dict]:
@@ -66,10 +105,10 @@ def listar_recursos_csv(dataset_id: str) -> list[dict]:
     url = f"{_BASE_URL}/package_show"
     params = {"id": dataset_id}
     try:
-        response = requests.get(url, params=params, timeout=_TIMEOUT)
+        response = session.get(url, params=params, timeout=_TIMEOUT)
         response.raise_for_status()
         data = response.json()
-    except requests.RequestException as exc:
+    except Exception as exc:
         logger.error("OpenDataSUS indisponível (listar_recursos_csv): %s", exc)
         return []
 
@@ -107,9 +146,9 @@ def download_csv(url: str, destino: str) -> bool:
     os.makedirs(os.path.dirname(os.path.abspath(destino)), exist_ok=True)
 
     try:
-        response = requests.get(url, stream=True, timeout=_TIMEOUT)
+        response = session.get(url, stream=True, timeout=_TIMEOUT)
         response.raise_for_status()
-    except requests.RequestException as exc:
+    except Exception as exc:
         logger.error("Erro ao iniciar download de %s: %s", url, exc)
         return False
 
