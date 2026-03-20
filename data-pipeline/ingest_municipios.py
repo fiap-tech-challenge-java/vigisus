@@ -74,11 +74,25 @@ def upsert_municipios(municipios: list) -> int:
     for m in municipios:
         co_ibge = str(m["id"])
         lat, lon = COORDENADAS_CONHECIDAS.get(co_ibge, (None, None))
+        
+        # Safely extract UF sigla from nested structure
+        sg_uf = None
+        try:
+            microrregiao = m.get("microrregiao")
+            if microrregiao:
+                mesorregiao = microrregiao.get("mesorregiao")
+                if mesorregiao:
+                    uf = mesorregiao.get("UF")
+                    if uf:
+                        sg_uf = uf.get("sigla")
+        except (KeyError, TypeError):
+            logger.warning("Could not extract UF for município %s (%s)", m.get("nome"), co_ibge)
+        
         records.append(
             {
                 "co_ibge": co_ibge,
                 "no_municipio": m["nome"],
-                "sg_uf": m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
+                "sg_uf": sg_uf,
                 "nu_latitude": lat,
                 "nu_longitude": lon,
             }
