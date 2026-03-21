@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HeaderAlerta from '../components/HeaderAlerta';
 import KpiCards from '../components/KpiCards';
 import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
 import RiscoFuturo from '../components/RiscoFuturo';
 import MapaHospitais from '../components/MapaHospitais';
+import MapaEstado from '../components/MapaEstado';
 import ResumoIa from '../components/ResumoIa';
 import InterpretacaoOperacional from '../components/InterpretacaoOperacional';
+import { buscarRankingEstado } from '../services/api';
 
 function mapHospital(h) {
   return {
@@ -24,6 +26,16 @@ function Resultado() {
   const location = useLocation();
   const navigate = useNavigate();
   const { dados, pergunta } = location.state || {};
+
+  const [rankingEstado, setRankingEstado] = useState([]);
+
+  useEffect(() => {
+    if (dados?.perfil?.uf) {
+      buscarRankingEstado(dados.perfil.uf, dados.perfil.ano)
+        .then(r => setRankingEstado(r?.ranking || []))
+        .catch(() => {});
+    }
+  }, [dados]);
 
   if (!dados) {
     navigate('/');
@@ -64,6 +76,18 @@ function Resultado() {
 
       {/* BLOCO 4 — Gráfico */}
       <CurvaEpidemiologica perfil={perfilMapped} />
+
+      {/* BLOCO 5 — Mapa coroplético do estado */}
+      <div className="px-6 max-w-6xl mx-auto mt-4 mb-2">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          🗺️ Panorama do estado — {dados?.perfil?.uf} · {dados?.perfil?.ano}
+        </p>
+        <MapaEstado
+          uf={dados?.perfil?.uf}
+          coIbgeDestaque={dados?.perfil?.coIbge}
+          ranking={rankingEstado}
+        />
+      </div>
 
       <header className="bg-sus-green text-white px-4 py-4 shadow">
         <div className="max-w-4xl mx-auto flex items-center justify-between">

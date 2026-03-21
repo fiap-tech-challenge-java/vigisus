@@ -22,4 +22,10 @@ export const buscarSituacaoAtual = async (uf = "MG", top = 6) => {
   return res.data;
 };
 
+export const buscarRankingEstado = async (uf, ano = 2024) => {
+  // top=853 cobre todos os municípios do maior estado (MG), retornando o estado completo
+  const res = await api.get(`/api/ranking?uf=${uf}&doenca=dengue&ano=${ano}&top=853`);
+  return res.data;
+};
+
 export default api;
