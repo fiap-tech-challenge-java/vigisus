@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { buscarPorPergunta } from "../services/api";
+import { buscarPorPergunta, buscarSituacaoAtual } from "../services/api";
 
 const UFS = [
   "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
@@ -29,6 +29,30 @@ export default function Home() {
 
   // Busca livre (secundária)
   const [buscaLivre, setBuscaLivre] = useState("");
+
+  // Situação atual — cards dinâmicos
+  const [situacao, setSituacao] = useState([]);
+
+  useEffect(() => {
+    buscarSituacaoAtual("MG", 6)
+      .then(data => setSituacao(data?.ranking || []))
+      .catch(() => {});
+  }, []);
+
+  // Cores por classificação
+  const COR_BADGE = {
+    EPIDEMIA: "bg-red-100 text-red-700 border-red-200",
+    ALTO:     "bg-orange-100 text-orange-700 border-orange-200",
+    MODERADO: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    BAIXO:    "bg-green-100 text-green-700 border-green-200",
+  };
+
+  const ICONE = {
+    EPIDEMIA: "🔴",
+    ALTO:     "🟠",
+    MODERADO: "🟡",
+    BAIXO:    "🟢",
+  };
 
   const buscarEstruturado = async (e) => {
     e.preventDefault();
@@ -174,6 +198,47 @@ export default function Home() {
           </button>
         ))}
       </div>
+
+      {/* Cards dinâmicos — situação atual */}
+      {situacao.length > 0 && (
+        <div className="mt-8 w-full max-w-lg">
+          <p className="text-xs text-gray-400 uppercase tracking-wider text-center mb-3">
+            Situação atual — Minas Gerais
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {situacao.slice(0, 6).map((m) => (
+              <button
+                key={m.municipio}
+                onClick={() => executarBusca(`dengue em ${m.municipio} MG 2024`)}
+                className={`flex items-center justify-between p-3 rounded-xl
+                            border text-left hover:opacity-80 transition
+                            ${COR_BADGE[m.classificacao] || COR_BADGE.BAIXO}`}
+              >
+                <div>
+                  <p className="text-xs font-semibold">{m.municipio}</p>
+                  <p className="text-xs opacity-70">
+                    {m.incidencia100k?.toFixed(0)}/100k
+                  </p>
+                </div>
+                <span className="text-lg">
+                  {ICONE[m.classificacao] || "⚪"}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Alerta se tiver municípios em epidemia */}
+          {(() => {
+            const epidemiaCount = situacao.filter(m => m.classificacao === "EPIDEMIA").length;
+            return epidemiaCount > 0 ? (
+              <p className="text-xs text-red-500 text-center mt-3">
+                ⚠️ {epidemiaCount} município(s)
+                em situação de epidemia
+              </p>
+            ) : null;
+          })()}
+        </div>
+      )}
     </div>
   );
 }
