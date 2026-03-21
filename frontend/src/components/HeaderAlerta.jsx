@@ -17,8 +17,10 @@ export default function HeaderAlerta({ perfil, risco }) {
         <div className="flex flex-wrap items-center gap-6">
 
           {/* Badge classificação */}
-          <span className="text-3xl font-black tracking-tight">
-            {perfil?.classificacao === "EPIDEMIA" && "🔴 "}
+          <span className="text-4xl md:text-5xl font-black tracking-tight">
+            {perfil?.classificacao === "EPIDEMIA" && (
+              <span className="inline-block animate-pulse mr-2">🔴</span>
+            )}
             {perfil?.classificacao === "ALTO" && "🟠 "}
             {perfil?.classificacao === "MODERADO" && "🟡 "}
             {perfil?.classificacao === "BAIXO" && "🟢 "}

@@ -1,9 +1,9 @@
 export const CORES = {
-  EPIDEMIA:    { bg: "bg-red-600",    text: "text-white",  badge: "bg-red-100 text-red-800",       hex: "#DC2626" },
-  ALTO:        { bg: "bg-orange-500", text: "text-white",  badge: "bg-orange-100 text-orange-800",  hex: "#EA580C" },
-  MODERADO:    { bg: "bg-yellow-500", text: "text-white",  badge: "bg-yellow-100 text-yellow-800",  hex: "#CA8A04" },
-  BAIXO:       { bg: "bg-green-600",  text: "text-white",  badge: "bg-green-100 text-green-800",    hex: "#16A34A" },
-  INDISPONIVEL:{ bg: "bg-gray-400",   text: "text-white",  badge: "bg-gray-100 text-gray-600",      hex: "#6B7280" },
+  EPIDEMIA:    { bg: "bg-red-600",    text: "text-white",  badge: "bg-red-100 text-red-800",       hex: "#DC2626", borda: "border-red-500",    light: "bg-red-50"    },
+  ALTO:        { bg: "bg-orange-500", text: "text-white",  badge: "bg-orange-100 text-orange-800",  hex: "#EA580C", borda: "border-orange-400",  light: "bg-orange-50"  },
+  MODERADO:    { bg: "bg-yellow-500", text: "text-white",  badge: "bg-yellow-100 text-yellow-800",  hex: "#CA8A04", borda: "border-yellow-400",  light: "bg-yellow-50"  },
+  BAIXO:       { bg: "bg-green-600",  text: "text-white",  badge: "bg-green-100 text-green-800",    hex: "#16A34A", borda: "border-green-500",   light: "bg-green-50"   },
+  INDISPONIVEL:{ bg: "bg-gray-400",   text: "text-white",  badge: "bg-gray-100 text-gray-600",      hex: "#6B7280", borda: "border-gray-300",    light: "bg-gray-50"    },
 };
 
 export const getCor = (classificacao) =>

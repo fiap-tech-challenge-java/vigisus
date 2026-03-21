@@ -52,6 +52,10 @@ function Resultado() {
 
   const perfil = dados.perfil || {};
 
+  const hoje = new Date();
+  const em14dias = new Date(hoje.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const formatarData = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
   // Map perfil fields to the shape expected by ResumoIa and MapaHospitais
   const perfilMapped = {
     ...perfil,
@@ -103,7 +107,7 @@ function Resultado() {
 
         {/* 5. RISCO FUTURO — 14 bolinhas */}
         <section>
-          <SectionTitle icone="🌡️" titulo="Risco futuro" />
+          <SectionTitle icone="🌡️" titulo={`Risco climático — ${formatarData(hoje)} a ${formatarData(em14dias)}`} />
           <RiscoFuturo risco={dados?.risco} />
         </section>
 

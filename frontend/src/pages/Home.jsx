@@ -108,6 +108,47 @@ export default function Home() {
         </p>
       </div>
 
+      {/* Context banner — visão geral do estado antes do formulário */}
+      <div className="w-full max-w-lg mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              📍 Visão geral — {ufCards}
+            </p>
+            <select
+              value={ufCards}
+              onChange={e => setUfCards(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-500"
+            >
+              {UFS.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+
+          {situacao.length > 0 && (
+            <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+              <div>
+                <p className="text-lg font-black text-red-600">
+                  {situacao.filter(m => m.classificacao === "EPIDEMIA").length}
+                </p>
+                <p className="text-xs text-gray-400">em epidemia</p>
+              </div>
+              <div>
+                <p className="text-lg font-black text-orange-500">
+                  {situacao.filter(m => m.classificacao === "ALTO").length}
+                </p>
+                <p className="text-xs text-gray-400">em alerta</p>
+              </div>
+              <div>
+                <p className="text-lg font-black text-green-600">
+                  {situacao.filter(m => m.classificacao === "BAIXO" || m.classificacao === "MODERADO").length}
+                </p>
+                <p className="text-xs text-gray-400">situação ok</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Formulário */}
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-lg">
         <form onSubmit={submitEstruturado}>
