@@ -6,6 +6,7 @@ import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
 import RiscoFuturo from '../components/RiscoFuturo';
 import MapaHospitais from '../components/MapaHospitais';
 import ResumoIa from '../components/ResumoIa';
+import InterpretacaoOperacional from '../components/InterpretacaoOperacional';
 
 function mapHospital(h) {
   return {
@@ -55,10 +56,13 @@ function Resultado() {
       {/* BLOCO 1 — Header colorido */}
       <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />
 
-      {/* BLOCO 2 — KPI Cards */}
+      {/* BLOCO 2 — Interpretação Operacional */}
+      <InterpretacaoOperacional perfil={perfilMapped} />
+
+      {/* BLOCO 3 — KPI Cards */}
       <KpiCards perfil={perfilMapped} risco={dados?.risco} />
 
-      {/* BLOCO 3 — Gráfico */}
+      {/* BLOCO 4 — Gráfico */}
       <CurvaEpidemiologica perfil={perfilMapped} />
 
       <header className="bg-sus-green text-white px-4 py-4 shadow">
