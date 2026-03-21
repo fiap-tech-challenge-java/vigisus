@@ -76,7 +76,9 @@ export default function CurvaEpidemiologica({ perfil }) {
   return (
     <div className="bg-white rounded-xl shadow p-6 mx-6 max-w-6xl md:mx-auto">
       <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-        📈 Curva epidemiológica — {perfil.doenca} {perfil.ano}
+        📈 {perfil?.semanasAnoAnterior?.length
+          ? `Casos por semana — ${perfil.ano} vs ${perfil.ano - 1}`
+          : `Casos por semana — ${perfil.doenca} ${perfil.ano}`}
         <span className="ml-2 text-xs text-gray-400 normal-case">
           Pico: {pico} casos na semana {semPico}
         </span>

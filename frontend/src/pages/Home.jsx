@@ -44,8 +44,14 @@ export default function Home() {
   useEffect(() => {
     setLoadingCards(true);
     buscarSituacaoAtual(ufCards, 6)
-      .then(data => setSituacao(data?.ranking || []))
-      .catch(() => setSituacao([]))
+      .then(data => {
+        const lista = data?.ranking || data?.content || data || [];
+        setSituacao(Array.isArray(lista) ? lista : []);
+      })
+      .catch(err => {
+        console.warn("Erro ao carregar situação atual:", err);
+        setSituacao([]);
+      })
       .finally(() => setLoadingCards(false));
   }, [ufCards]);
 

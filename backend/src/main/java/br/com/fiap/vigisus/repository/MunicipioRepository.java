@@ -13,4 +13,8 @@ public interface MunicipioRepository extends JpaRepository<Municipio, Long> {
     Optional<Municipio> findByCoIbge(String coIbge);
 
     List<Municipio> findBySgUf(String sgUf);
+
+    List<Municipio> findByNoMunicipioContainingIgnoreCaseAndSgUf(String nome, String sgUf);
+
+    Optional<Municipio> findTop1ByNoMunicipioContainingIgnoreCase(String nome);
 }

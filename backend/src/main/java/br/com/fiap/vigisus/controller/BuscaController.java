@@ -142,12 +142,19 @@ public class BuscaController {
             throw new NotFoundException("Nome do município não identificado na pergunta");
         }
         if (uf != null && !uf.isBlank()) {
-            List<Municipio> candidatos = municipioService.listarPorUf(uf);
-            return candidatos.stream()
-                    .filter(m -> m.getNoMunicipio().equalsIgnoreCase(nome))
-                    .findFirst()
+            List<Municipio> candidatos = municipioService.buscarPorNomeEUf(nome, uf);
+            if (!candidatos.isEmpty()) {
+                if (candidatos.size() > 1) {
+                    log.info("[Busca] {} municípios encontrados para '{}'/{}. Usando o primeiro: {}",
+                            candidatos.size(), nome, uf, candidatos.get(0).getNoMunicipio());
+                }
+                return candidatos.get(0);
+            }
+            // Try searching by name only
+            return municipioService.buscarPorNome(nome)
                     .orElseThrow(() -> new NotFoundException(
-                            "Município '" + nome + "' não encontrado. Tente informar o código IBGE diretamente."));
+                            "Município '" + nome + "' não encontrado. " +
+                            "Tente usar o nome completo ou o código IBGE."));
         }
         throw new NotFoundException("UF não identificada na pergunta");
     }

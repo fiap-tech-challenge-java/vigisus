@@ -59,10 +59,6 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
 
   return (
     <div className="mx-6 max-w-6xl md:mx-auto mt-4">
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-        🏥 Hospitais com estrutura disponível
-      </h2>
-
       <div className="flex flex-col md:flex-row gap-4">
 
         {/* MAPA */}

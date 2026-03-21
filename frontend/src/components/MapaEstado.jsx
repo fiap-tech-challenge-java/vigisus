@@ -60,17 +60,28 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
       .catch(() => {});
   }, [codEstado]);
 
-  // Monta mapa de classificação por coIbge
+  // Monta mapa de classificação por coIbge (normalizado para 7 dígitos)
   const classificacaoMap = {};
   (ranking || []).forEach(m => {
-    classificacaoMap[m.coIbge] = m.classificacao;
+    const cod = m.coIbge || m.co_ibge || m.codigo || m.ibge;
+    if (cod) {
+      const codStr = String(cod).padStart(7, '0');
+      classificacaoMap[codStr] = m.classificacao;
+    }
   });
 
+  useEffect(() => {
+    if (ranking?.length > 0) {
+      console.log("Primeiro item do ranking:", ranking[0]);
+      console.log("Chaves disponíveis:", Object.keys(ranking[0]));
+    }
+  }, [ranking]);
+
   const estilizarFeature = (feature) => {
-    // O GeoJSON do IBGE tem o código do município em properties.codarea
-    const cod = feature?.properties?.codarea;
+    // O GeoJSON do IBGE tem o código do município em properties.codarea (7 dígitos)
+    const cod = String(feature?.properties?.codarea || "").padStart(7, '0');
     const classif = classificacaoMap[cod] || "SEM_DADO";
-    const isDestaque = cod === coIbgeDestaque;
+    const isDestaque = cod === String(coIbgeDestaque || "").padStart(7, '0');
 
     return {
       fillColor: COR_MAPA[classif],
@@ -81,9 +92,12 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
   };
 
   const onEachFeature = (feature, layer) => {
-    const cod = feature?.properties?.codarea;
+    const cod = String(feature?.properties?.codarea || "").padStart(7, '0');
     const classif = classificacaoMap[cod];
-    const municipio = (ranking || []).find(m => m.coIbge === cod);
+    const municipio = (ranking || []).find(m => {
+      const mCod = m.coIbge || m.co_ibge || m.codigo || m.ibge;
+      return mCod && String(mCod).padStart(7, '0') === cod;
+    });
 
     if (municipio) {
       layer.bindTooltip(
