@@ -54,16 +54,16 @@ function Resultado() {
     <div className="min-h-screen bg-gray-50">
 
       {/* BLOCO 1 — Header colorido */}
-      <HeaderAlerta perfil={dados?.perfil} risco={dados?.risco} />
+      <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />
 
       {/* BLOCO 2 — Interpretação Operacional */}
-      <InterpretacaoOperacional perfil={dados?.perfil} />
+      <InterpretacaoOperacional perfil={perfilMapped} />
 
       {/* BLOCO 3 — KPI Cards */}
-      <KpiCards perfil={dados?.perfil} risco={dados?.risco} />
+      <KpiCards perfil={perfilMapped} risco={dados?.risco} />
 
       {/* BLOCO 4 — Gráfico */}
-      <CurvaEpidemiologica perfil={dados?.perfil} />
+      <CurvaEpidemiologica perfil={perfilMapped} />
 
       <header className="bg-sus-green text-white px-4 py-4 shadow">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
