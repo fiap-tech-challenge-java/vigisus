@@ -1,14 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HeaderAlerta from '../components/HeaderAlerta';
+import InterpretacaoOperacional from '../components/InterpretacaoOperacional';
 import KpiCards from '../components/KpiCards';
 import CurvaEpidemiologica from '../components/CurvaEpidemiologica';
 import RiscoFuturo from '../components/RiscoFuturo';
-import MapaHospitais from '../components/MapaHospitais';
 import MapaEstado from '../components/MapaEstado';
+import MapaHospitais from '../components/MapaHospitais';
 import ResumoIa from '../components/ResumoIa';
-import InterpretacaoOperacional from '../components/InterpretacaoOperacional';
 import { buscarRankingEstado } from '../services/api';
+
+function SectionTitle({ icone, titulo }) {
+  return (
+    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+      {icone} {titulo}
+    </p>
+  );
+}
 
 function mapHospital(h) {
   return {
@@ -25,7 +33,7 @@ function mapHospital(h) {
 function Resultado() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { dados, pergunta } = location.state || {};
+  const { dados } = location.state || {};
 
   const [rankingEstado, setRankingEstado] = useState([]);
 
@@ -43,7 +51,6 @@ function Resultado() {
   }
 
   const perfil = dados.perfil || {};
-  const interpretacao = dados.interpretacao || {};
 
   // Map perfil fields to the shape expected by ResumoIa and MapaHospitais
   const perfilMapped = {
@@ -58,79 +65,74 @@ function Resultado() {
     hospitais: (dados.encaminhamento.hospitais || []).map(mapHospital),
   } : null;
 
-  const municipioNome = perfil.municipio || interpretacao.municipio;
-  const municipioUf = perfil.uf || interpretacao.uf;
-  const condicao = perfil.doenca || interpretacao.doenca;
-
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* BLOCO 1 — Header colorido */}
+      {/* 1. CONTEXTO — header colorido */}
       <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />
 
-      {/* BLOCO 2 — Interpretação Operacional */}
-      <InterpretacaoOperacional perfil={perfilMapped} />
-
-      {/* BLOCO 3 — KPI Cards */}
-      <KpiCards perfil={perfilMapped} risco={dados?.risco} />
-
-      {/* BLOCO 4 — Gráfico */}
-      <CurvaEpidemiologica perfil={perfilMapped} />
-
-      {/* BLOCO 5 — Mapa coroplético do estado */}
-      <div className="px-6 max-w-6xl mx-auto mt-4 mb-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          🗺️ Panorama do estado — {dados?.perfil?.uf} · {dados?.perfil?.ano}
+      {/* Breadcrumb pequeno — substitui o header verde do meio */}
+      <div className="bg-white border-b border-gray-100 px-6 py-2
+                      flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        <p className="text-xs text-gray-400">
+          {dados?.perfil?.municipio} · {dados?.perfil?.uf} ·{" "}
+          {dados?.perfil?.doenca} · {dados?.perfil?.ano}
         </p>
-        <MapaEstado
-          uf={dados?.perfil?.uf}
-          coIbgeDestaque={dados?.perfil?.coIbge}
-          ranking={rankingEstado}
-        />
+        <button
+          onClick={() => navigate("/")}
+          className="text-xs text-red-500 hover:underline"
+        >
+          ← Nova busca
+        </button>
       </div>
 
-      <header className="bg-sus-green text-white px-4 py-4 shadow">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-white hover:text-green-100 transition-colors"
-          >
-            <span className="text-xl font-bold">VígiSUS</span>
-          </button>
-          <p className="text-green-100 text-sm truncate max-w-xs md:max-w-none">
-            "{pergunta}"
-          </p>
-          <button
-            onClick={() => navigate('/')}
-            className="text-green-100 hover:text-white text-sm underline"
-          >
-            Nova busca
-          </button>
-        </div>
-      </header>
+      {/* Container único com espaçamento consistente */}
+      <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {municipioNome && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-            <h1 className="text-xl font-bold text-gray-900">
-              {municipioNome}
-              {municipioUf ? ` — ${municipioUf}` : ''}
-            </h1>
-            {condicao && (
-              <p className="text-sus-blue font-medium capitalize">{condicao}</p>
-            )}
-          </div>
-        )}
+        {/* 2. INTERPRETAÇÃO — o que isso significa */}
+        <InterpretacaoOperacional perfil={dados?.perfil} />
 
-        {/* Risco 14 dias */}
-        <RiscoFuturo risco={dados.risco} />
+        {/* 3. KPIs — números principais */}
+        <KpiCards perfil={perfilMapped} risco={dados?.risco} />
 
-        {/* Mapa + lista de Hospitais */}
-        <MapaHospitais perfil={perfilMapped} encaminhamento={encaminhamentoMapped} />
+        {/* 4. ANÁLISE — curva epidemiológica */}
+        <section>
+          <SectionTitle icone="📈" titulo="Evolução dos casos" />
+          <CurvaEpidemiologica perfil={dados?.perfil} />
+        </section>
 
-        {/* Resumo IA */}
-        <ResumoIa textoIa={dados.textoIa} perfil={perfilMapped} />
-      </main>
+        {/* 5. RISCO FUTURO — 14 bolinhas */}
+        <section>
+          <SectionTitle icone="🌡️" titulo="Risco futuro" />
+          <RiscoFuturo risco={dados?.risco} />
+        </section>
+
+        {/* 6. VISÃO MACRO — mapa do estado */}
+        <section>
+          <SectionTitle icone="🗺️" titulo="Distribuição regional" />
+          <MapaEstado
+            uf={dados?.perfil?.uf}
+            coIbgeDestaque={dados?.perfil?.coIbge}
+            ranking={rankingEstado}
+          />
+        </section>
+
+        {/* 7. AÇÃO — hospitais + mapa local */}
+        <section>
+          <SectionTitle icone="🏥" titulo="Infraestrutura disponível" />
+          <MapaHospitais
+            perfil={perfilMapped}
+            encaminhamento={encaminhamentoMapped}
+          />
+        </section>
+
+        {/* 8. RESUMO FINAL — IA */}
+        <section>
+          <SectionTitle icone="📋" titulo="Resumo operacional" />
+          <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
+        </section>
+
+      </div>
     </div>
   );
 }
