@@ -16,4 +16,10 @@ export const buscarRisco = (coIbge) =>
 export const buscarHospitais = (coIbge, grav) =>
   api.get('/api/encaminhar', { params: { municipio: coIbge, condicao: grav } });
 
+// Busca ranking dos municípios com pior situação
+export const buscarSituacaoAtual = async (uf = "MG", top = 6) => {
+  const res = await api.get(`/api/ranking?uf=${uf}&doenca=dengue&ano=2024&top=${top}&ordem=piores`);
+  return res.data;
+};
+
 export default api;
