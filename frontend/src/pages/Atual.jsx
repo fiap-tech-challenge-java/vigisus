@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
+import OQueFazerAgora from "../components/OQueFazerAgora";
+import KpiCards from "../components/KpiCards";
 import InterpretacaoOperacional from "../components/InterpretacaoOperacional";
 import StatusRapido from "../components/StatusRapido";
 import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
@@ -170,6 +172,8 @@ export default function Atual() {
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
 
+        {/* 2. O que fazer agora — tomada de decisão com IA */}
+        <OQueFazerAgora perfil={perfil} textoIa={dados?.textoIa} />
         {/* 2. Interpretação operacional — tomada de decisão */}
         <section>
           {loadingDados ? (
