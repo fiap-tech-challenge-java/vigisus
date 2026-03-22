@@ -18,8 +18,9 @@ export const buscarHospitais = (coIbge, grav) =>
 
 // Busca ranking dos municípios com pior situação
 export const buscarSituacaoAtual = async (uf = "MG", top = 6) => {
+  const ANO_ATUAL = new Date().getFullYear();
   try {
-    const res = await api.get(`/api/ranking?uf=${uf}&doenca=dengue&ano=2024&top=${top}&ordem=piores`);
+    const res = await api.get(`/api/ranking?uf=${uf}&doenca=dengue&ano=${ANO_ATUAL}&top=${top}&ordem=piores`);
     return res.data;
   } catch (err) {
     console.warn("buscarSituacaoAtual falhou:", err?.response?.status, err?.message);
@@ -27,7 +28,7 @@ export const buscarSituacaoAtual = async (uf = "MG", top = 6) => {
   }
 };
 
-export const buscarRankingEstado = async (uf, ano = 2024) => {
+export const buscarRankingEstado = async (uf, ano = new Date().getFullYear()) => {
   // top=853 cobre todos os municípios do maior estado (MG), retornando o estado completo
   const res = await api.get(`/api/ranking?uf=${uf}&doenca=dengue&ano=${ano}&top=853`);
   return res.data;

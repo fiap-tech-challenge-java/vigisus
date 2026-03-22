@@ -78,6 +78,7 @@ public class PerfilEpidemiologicoService {
                 .classificacao(classificacao)
                 .comparativoEstado(comparativoEstado)
                 .tendencia(tendencia)
+                .semanas(semanasAnoAtual)
                 .semanasAnoAnterior(semanasAnoAnterior)
                 .incidenciaMediaEstado(incidenciaMediaEstado)
                 .posicaoEstado(posicaoEstado)

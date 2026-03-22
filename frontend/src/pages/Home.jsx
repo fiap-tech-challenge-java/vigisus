@@ -96,8 +96,8 @@ export default function Home() {
 
   // ── Clique no card de cidade crítica ─────────────────────
   const clicarCard = (card) => {
-    const pergunta = `${doenca} em ${card.municipio} ${ufCards} ${ano}`;
-    executarBusca(pergunta, ano);
+    const pergunta = `${doenca} em ${card.municipio} ${ufCards}`;
+    executarBusca(pergunta, null);
   };
 
   // ── Botões de exemplo rápido ─────────────────────────────
