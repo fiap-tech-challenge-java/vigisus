@@ -27,7 +27,7 @@ export default function TopNav() {
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
 
         {/* Logo */}
-        <Link to="/" className="text-red-600 font-bold text-lg shrink-0">
+        <Link to="/home" className="text-red-600 font-bold text-lg shrink-0">
           🏥 VígiSUS
         </Link>
 
@@ -57,7 +57,7 @@ export default function TopNav() {
 
         {/* Nova busca */}
         <Link
-          to="/"
+          to="/home"
           className="text-xs text-gray-500 hover:text-red-500 transition shrink-0"
         >
           ← Nova busca

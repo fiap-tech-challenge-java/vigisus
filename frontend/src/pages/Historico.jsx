@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
 import KpiCards from "../components/KpiCards";
@@ -43,7 +43,7 @@ export default function Historico() {
 
   useEffect(() => {
     if (!municipio || !uf) {
-      navigate("/");
+      navigate("/home");
       return;
     }
     if (!dados) {
@@ -65,6 +65,17 @@ export default function Historico() {
     }
   }, [dados]);
 
+  // Redirect years that are not truly historical to the current view
+  const ANO_ATUAL = new Date().getFullYear();
+  const anoNum = ano ? Number(ano) : null;
+  if (anoNum !== null && anoNum > ANO_ATUAL - 2) {
+    const params = new URLSearchParams();
+    if (municipio) params.set("municipio", municipio);
+    if (uf) params.set("uf", uf);
+    if (doenca) params.set("doenca", doenca);
+    return <Navigate to={`/atual?${params.toString()}`} replace />;
+  }
+
   if (loading) {
     return (
       <>
@@ -85,7 +96,7 @@ export default function Historico() {
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
           <p className="text-red-500 text-sm">{erro}</p>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/home")}
             className="text-xs text-gray-500 hover:text-red-500 transition"
           >
             ← Voltar à busca
