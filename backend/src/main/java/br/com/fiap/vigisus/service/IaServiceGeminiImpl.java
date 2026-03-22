@@ -72,25 +72,19 @@ public class IaServiceGeminiImpl implements IaService {
     @Override
     public String gerarTextoEpidemiologico(PerfilEpidemiologicoResponse perfil) {
         String prompt = String.format(
-            "Você é um sistema de informação em saúde pública do Brasil. " +
-            "Com base nos dados reais abaixo, escreva um resumo informativo " +
-            "em no máximo 4 linhas para um profissional de saúde. " +
-            "NÃO use verbos imperativos. NÃO tome decisões. " +
-            "Apenas organize o contexto de forma clara e objetiva. " +
-            "Use linguagem simples, sem jargões. " +
-            "IMPORTANTE: use apenas os dados fornecidos, não invente nada.\n\n" +
-            "Município: %s - %s\n" +
-            "Doença: %s\n" +
-            "Ano: %d\n" +
-            "Total de casos: %d\n" +
-            "Incidência por 100 mil habitantes: %.1f\n" +
-            "Classificação: %s",
-            perfil.getMunicipio(),
-            perfil.getUf(),
-            perfil.getDoenca(),
-            perfil.getAno(),
-            perfil.getTotal(),
-            perfil.getIncidencia(),
+            "Resuma em 2 linhas apenas os FATOS epidemiológicos abaixo.\n" +
+            "Sem análise, sem recomendação, sem verbos imperativos.\n" +
+            "Use formato claro ponto a ponto.\n\n" +
+            "FATOS:\n" +
+            "- Local: %s, %s\n" +
+            "- Doença: %s em %d\n" +
+            "- Casos notificados ao SINAN: %d\n" +
+            "- Taxa de incidência: %.1f por 100 mil\n" +
+            "- Classificação de risco: %s\n\n" +
+            "Resuma em máximo 2 linhas diretas:",
+            perfil.getMunicipio(), perfil.getUf(),
+            perfil.getDoenca(), perfil.getAno(),
+            perfil.getTotal(), perfil.getIncidencia(),
             perfil.getClassificacao()
         );
 
@@ -227,21 +221,25 @@ public class IaServiceGeminiImpl implements IaService {
     // ─────────────────────────────────────────────────
     private String fallbackEpidemiologico(PerfilEpidemiologicoResponse perfil) {
         return String.format(
-            "Em %d, %s/%s registrou %d casos de %s, " +
-            "com incidência de %.1f por 100 mil habitantes. " +
-            "Situação classificada como %s.",
-            perfil.getAno(), perfil.getMunicipio(), perfil.getUf(),
-            perfil.getTotal(), perfil.getDoenca(),
+            "%s/%s: %d casos de %s em %d (incidência %.1f/100k). " +
+            "Situação: %s.",
+            perfil.getMunicipio(), perfil.getUf(),
+            perfil.getTotal(), perfil.getDoenca(), perfil.getAno(),
             perfil.getIncidencia(), perfil.getClassificacao()
         );
     }
 
     private String fallbackRisco(PrevisaoRiscoResponse previsao) {
+        String fatores = previsao.getFatores() != null && !previsao.getFatores().isEmpty()
+            ? String.join(", ", previsao.getFatores())
+            : "Clima favorável ao vetor";
+            
         return String.format(
-            "Contexto epidemiológico de %s: risco %s para as próximas 2 semanas (score %d/8).",
+            "Risco no %s: %s (score %d/8). Fatores: %s.",
             previsao.getMunicipio(),
             previsao.getClassificacao(),
-            previsao.getScore()
+            previsao.getScore(),
+            fatores
         );
     }
 }

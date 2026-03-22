@@ -1,60 +1,49 @@
 // KpisHistorico — 2 cards grandes para o modo Histórico
 // Card 1: Total do ano | Card 2: Pico registrado (incidência + mês)
 
-const MESES = [
-  "", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+/** Lookup de semana epidemiológica (1–52) → mês abreviado (pt-BR). */
+const MESES_SEMANA = [
+  "",
+  "Jan","Jan","Jan","Jan",
+  "Fev","Fev","Fev","Fev",
+  "Mar","Mar","Mar","Mar","Mar",
+  "Abr","Abr","Abr","Abr",
+  "Mai","Mai","Mai","Mai",
+  "Jun","Jun","Jun","Jun",
+  "Jul","Jul","Jul","Jul","Jul",
+  "Ago","Ago","Ago","Ago",
+  "Set","Set","Set","Set",
+  "Out","Out","Out","Out","Out",
+  "Nov","Nov","Nov","Nov",
+  "Dez","Dez","Dez","Dez",
 ];
 
-/** Converte semana epidemiológica (1–52) para mês abreviado.
- *  Nota: esta é uma aproximação — cada mês tem ~4,33 semanas e as semanas
- *  epidemiológicas nem sempre coincidem com o início do mês calendário.
- */
-function semanaParaMes(semana) {
-  if (!semana) return "";
-  // Cada mês tem ~4.33 semanas; semana 1 começa em janeiro.
-  const mes = Math.min(12, Math.ceil(semana / 4.33));
-  return MESES[mes] || "";
-}
+/** Encontra o pico nas semanas epidemiológicas, aceitando variações de nome de campo. */
+function calcularPico(semanas) {
+  if (!Array.isArray(semanas) || semanas.length === 0)
+    return { casos: null, semana: null, mes: "—" };
 
-/** Retorna o número de casos de uma entrada de semana, aceitando campos alternativos. */
-function getCasosFromSemana(s) {
-  return s.casos ?? s.totalCasos ?? 0;
+  const melhor = semanas.reduce((max, s) => {
+    const c = s.casos ?? s.totalCasos ?? s.total_casos ?? 0;
+    const m = max.casos ?? max.totalCasos ?? max.total_casos ?? 0;
+    return c > m ? s : max;
+  }, semanas[0]);
+
+  const casos  = melhor.casos ?? melhor.totalCasos ?? melhor.total_casos ?? 0;
+  const semana = melhor.semanaEpi ?? melhor.semana_epi ?? melhor.semana ?? 0;
+
+  return {
+    casos,
+    semana,
+    mes: MESES_SEMANA[semana] || (semana ? `Sem. ${semana}` : "—"),
+  };
 }
 
 export default function KpisHistorico({ perfil }) {
   if (!perfil) return null;
 
   const totalCasos = perfil.totalCasos ?? perfil.total ?? 0;
-  const semanas = perfil.semanas || [];
-
-  const picoDado = semanas.length
-    ? semanas.reduce((prev, curr) =>
-        getCasosFromSemana(curr) > getCasosFromSemana(prev) ? curr : prev
-      , semanas[0])
-    : null;
-
-  const picoCasos = picoDado != null ? getCasosFromSemana(picoDado) || null : null;
-  const picoSemana = picoDado != null
-    ? (picoDado.semanaEpi ?? picoDado.semana_epi ?? picoDado.semana ?? null)
-    : null;
-  const picoMes = semanaParaMes(picoSemana);
-
-  const populacao = perfil.populacao || null;
-  const incidenciaPico =
-    picoCasos && populacao ? ((picoCasos / populacao) * 100000).toFixed(0) : null;
-
-  // Valor e subtítulo do card de pico
-  const picoPrincipal = incidenciaPico
-    ? `${Number(incidenciaPico).toLocaleString("pt-BR")}/100k`
-    : picoCasos?.toLocaleString("pt-BR") ?? "—";
-
-  const picoSub = (() => {
-    if (!picoSemana) return "—";
-    const semLabel = `Semana ${picoSemana}${picoMes ? ` — ${picoMes}` : ""}`;
-    if (incidenciaPico) return `${semLabel} · ${picoCasos?.toLocaleString("pt-BR")} casos`;
-    return picoCasos ? `${semLabel} · ${picoCasos.toLocaleString("pt-BR")} casos` : semLabel;
-  })();
+  const pico = calcularPico(perfil.semanas);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 max-w-6xl mx-auto">
@@ -77,9 +66,11 @@ export default function KpisHistorico({ perfil }) {
           Pico registrado
         </p>
         <p className="text-5xl font-black text-red-700">
-          {picoPrincipal}
+          {pico.casos != null ? pico.casos.toLocaleString("pt-BR") : "—"}
         </p>
-        <p className="text-sm text-slate-500">{picoSub}</p>
+        <p className="text-sm text-slate-500">
+          {pico.mes !== "—" ? `Pico em ${pico.mes} · Semana ${pico.semana}` : "Sem dados"}
+        </p>
       </div>
     </div>
   );

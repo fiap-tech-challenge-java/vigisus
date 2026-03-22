@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.IntencaoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
+import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
 import br.com.fiap.vigisus.exception.NotFoundException;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.service.EncaminhamentoService;
@@ -17,10 +18,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
@@ -76,7 +80,34 @@ public class BuscaController {
         int ano = intencao.getAno() != null ? intencao.getAno() : LocalDate.now().getYear();
         String doenca = intencao.getDoenca() != null ? intencao.getDoenca() : "dengue";
 
-        // 4. Fetch perfil, risco and encaminhamento in parallel
+        // 4. Delegate to shared method and attach interpretation
+        BuscaCompletaResponse response = buscarPorCoIbge(coIbge, doenca, ano);
+        response.setInterpretacao(intencao);
+        return response;
+    }
+
+    @GetMapping("/perfil-direto")
+    @Operation(summary = "Busca perfil por município sem depender de IA")
+    public ResponseEntity<BuscaCompletaResponse> buscarDireto(
+            @RequestParam String municipio,
+            @RequestParam String uf,
+            @RequestParam(defaultValue = "dengue") String doenca,
+            @RequestParam(required = false) Integer ano) {
+
+        int anoFinal = (ano != null) ? ano : LocalDate.now().getYear();
+
+        Municipio mun = municipioService.buscarPorNomeEUf(municipio.trim(), uf.trim())
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new MunicipioNotFoundException(
+                        municipio.trim() + " / " + uf.trim()));
+
+        BuscaCompletaResponse response = buscarPorCoIbge(mun.getCoIbge(), doenca, anoFinal);
+        return ResponseEntity.ok(response);
+    }
+
+    private BuscaCompletaResponse buscarPorCoIbge(String coIbge, String doenca, int ano) {
+
         CompletableFuture<PerfilEpidemiologicoResponse> futurePerfil =
                 CompletableFuture.supplyAsync(() -> perfilService.gerarPerfil(coIbge, doenca, ano));
 
@@ -114,7 +145,6 @@ public class BuscaController {
         PrevisaoRiscoResponse risco = futureRisco.join();
         EncaminhamentoResponse encaminhamento = futureEncaminhamento.join();
 
-        // 5. Generate unified IA text
         String contextoUnificado = montarContextoUnificado(perfil, risco, encaminhamento);
         String textoIa;
         try {
@@ -129,7 +159,6 @@ public class BuscaController {
         }
 
         return BuscaCompletaResponse.builder()
-                .interpretacao(intencao)
                 .perfil(perfil)
                 .risco(risco)
                 .encaminhamento(encaminhamento)

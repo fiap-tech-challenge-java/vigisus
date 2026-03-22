@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Year;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +33,9 @@ public class EncaminhamentoService {
 
     // Maximum number of hospitals returned per search
     private static final int MAX_HOSPITAIS = 5;
+    
+    // Map of state capitals (2-letter UF → municipio code IBGE)
+    private static final Map<String, String> CAPITAIS_IBGE = criarMapaCapitais();
 
     /** Estimated fraction of dengue cases requiring hospital admission. */
     private static final double TAXA_INTERNACAO_ESTIMADA = 0.05;
@@ -185,5 +190,72 @@ public class EncaminhamentoService {
         if (ocupacaoEstimada < 0.75) return "ELEVADA";
         if (ocupacaoEstimada < 0.9) return "ALTA";
         return "CRITICA";
+    }
+
+    /**
+     * Busca hospitais principais das capitais dos estados
+     * Útil para visões agregadas (Brasil inteiro ou por estado)
+     */
+    public List<HospitalDTO> buscarHospitaisDasCapitais(String ufFiltro) {
+        List<HospitalDTO> resultado = new ArrayList<>();
+        
+        for (Map.Entry<String, String> capital : CAPITAIS_IBGE.entrySet()) {
+            // Se filtro de UF foi fornecido, pular estados diferentes
+            if (ufFiltro != null && !ufFiltro.isEmpty() && !capital.getKey().equals(ufFiltro)) {
+                continue;
+            }
+            
+            try {
+                EncaminhamentoResponse resp = buscarHospitais(capital.getValue(), "74", 1);
+                if (resp != null && resp.getHospitais() != null && !resp.getHospitais().isEmpty()) {
+                    // Retorna apenas o primeiro (melhor) hospital da capital
+                    resultado.add(resp.getHospitais().get(0));
+                }
+            } catch (Exception e) {
+                // Log silencioso - capital pode não ter hospitais registrados
+            }
+        }
+        
+        // Ordenar por quantidade de leitos (decrescente)
+        resultado.sort((a, b) -> Integer.compare(b.getQtLeitosSus(), a.getQtLeitosSus()));
+        
+        // Retornar top 5
+        return resultado.stream().limit(5).collect(Collectors.toList());
+    }
+
+    /**
+     * Cria mapa de capitais brasileiras com seus códigos IBGE
+     */
+    private static Map<String, String> criarMapaCapitais() {
+        Map<String, String> capitais = new HashMap<>();
+        // UF → IBGE code (formato: "SSMMMMM" - 7 dígitos)
+        capitais.put("AC", "1200401");  // Rio Branco
+        capitais.put("AL", "2704302");  // Maceió
+        capitais.put("AP", "1600407");  // Macapá
+        capitais.put("AM", "1302603");  // Manaus
+        capitais.put("BA", "2904144");  // Salvador
+        capitais.put("CE", "2304400");  // Fortaleza
+        capitais.put("DF", "5300108");  // Brasília
+        capitais.put("ES", "3200144");  // Vitória
+        capitais.put("GO", "5208050");  // Goiânia
+        capitais.put("MA", "2111300");  // São Luís
+        capitais.put("MT", "5103403");  // Cuiabá
+        capitais.put("MS", "2813602");  // Campo Grande
+        capitais.put("MG", "3106200");  // Belo Horizonte
+        capitais.put("PA", "1505402");  // Belém
+        capitais.put("PB", "2507202");  // João Pessoa
+        capitais.put("PR", "4106902");  // Curitiba
+        capitais.put("PE", "2611606");  // Recife
+        capitais.put("PI", "2211001");  // Teresina
+        capitais.put("RJ", "3304557");  // Rio de Janeiro
+        capitais.put("RN", "2408102");  // Natal
+        capitais.put("RS", "4314902");  // Porto Alegre
+        capitais.put("RO", "1703260");  // Porto Velho
+        capitais.put("RR", "1400100");  // Boa Vista
+        capitais.put("SC", "4204202");  // Florianópolis
+        capitais.put("SP", "3550308");  // São Paulo
+        capitais.put("SE", "2800308");  // Aracaju
+        capitais.put("TO", "2810004");  // Palmas
+        return Collections.unmodifiableMap(capitais);
     }
 }

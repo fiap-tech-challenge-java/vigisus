@@ -33,4 +33,27 @@ export const buscarRankingEstado = async (uf, ano = 2024) => {
   return res.data;
 };
 
+export const buscarMunicipio = async (
+  municipio, uf, doenca = "dengue", ano = null
+) => {
+  const params = new URLSearchParams({ municipio, uf, doenca });
+  if (ano) params.append("ano", ano);
+  const res = await api.get(`/api/busca/perfil-direto?${params}`);
+  return res.data;
+};
+
+export const buscarBrasil = async (doenca = "dengue", ano = null) => {
+  const params = new URLSearchParams({ doenca });
+  if (ano) params.append("ano", ano);
+  const res = await api.get(`/api/brasil/casos?${params}`);
+  return res.data;
+};
+
+export const buscarHospitaisCapitais = async (uf = null) => {
+  const params = new URLSearchParams();
+  if (uf) params.append("uf", uf);
+  const res = await api.get(`/api/hospitais/capitais?${params}`);
+  return res.data || [];
+};
+
 export default api;

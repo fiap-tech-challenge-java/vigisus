@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
-import HeaderAlerta from "../components/HeaderAlerta";
 import KpiCards from "../components/KpiCards";
 import KpisHistorico from "../components/KpisHistorico";
 import ComparacaoAnual from "../components/ComparacaoAnual";
@@ -9,8 +8,7 @@ import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
 import MapaEstado from "../components/MapaEstado";
 import TabelaRanking from "../components/TabelaRanking";
 import IAHistorico from "../components/IAHistorico";
-import ResumoIa from "../components/ResumoIa";
-import { buscarPorPergunta, buscarRankingEstado } from "../services/api";
+import { buscarMunicipio, buscarRankingEstado } from "../services/api";
 
 // Historico NUNCA mostra: InterpretacaoOperacional, MapaHospitais,
 // RiscoFuturo — apenas dados do período selecionado.
@@ -26,54 +24,45 @@ function SectionTitle({ icone, titulo }) {
 }
 
 
+const ANO_ATUAL = new Date().getFullYear();
+
 export default function Historico() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const municipio = searchParams.get("municipio");
-  const uf = searchParams.get("uf");
-  const ano = searchParams.get("ano");
-  const doenca = searchParams.get("doenca") || "dengue";
+  const municipioParam = searchParams.get("municipio");
+  const ufParam        = searchParams.get("uf")     || "MG";
+  const anoParam       = Number(searchParams.get("ano")) || 2024;
+  const doencaParam    = searchParams.get("doenca") || "dengue";
 
-  const [dados, setDados] = useState(location.state?.dados || null);
-  const [loading, setLoading] = useState(!location.state?.dados);
-  const [erro, setErro] = useState("");
+  const [dados, setDados]                 = useState(null);
   const [rankingEstado, setRankingEstado] = useState([]);
+  const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
-    if (!municipio || !uf) {
-      navigate("/home");
-      return;
-    }
-    if (!dados) {
-      const pergunta = `${doenca} em ${municipio} ${uf}${ano ? ` ${ano}` : ""}`;
-      setLoading(true);
-      buscarPorPergunta(pergunta)
-        .then(r => setDados(r.data))
-        .catch(() => setErro("Erro ao buscar dados. Tente novamente."))
-        .finally(() => setLoading(false));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [municipio, uf, ano, doenca]);
+    carregar(municipioParam, ufParam, doencaParam, anoParam);
+  }, [municipioParam, ufParam, doencaParam, anoParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (dados?.perfil?.uf) {
-      buscarRankingEstado(dados.perfil.uf, dados.perfil.ano)
-        .then(r => setRankingEstado(r?.ranking || []))
-        .catch(() => {});
+  const carregar = async (municipio, uf, doenca, ano) => {
+    setLoading(true);
+    try {
+      const resp = municipio
+        ? await buscarMunicipio(municipio, uf, doenca, ano)
+        : await buscarMunicipio("Belo Horizonte", uf, doenca, ano);
+      setDados(resp);
+      const ranking = await buscarRankingEstado(uf, doenca, ano);
+      setRankingEstado(ranking?.ranking || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
-  }, [dados]);
+  };
 
-  // Redirect years that are not truly historical to the current view
-  const ANO_ATUAL = new Date().getFullYear();
-  const anoNum = ano ? Number(ano) : null;
-  if (anoNum !== null && anoNum > ANO_ATUAL - 2) {
-    const params = new URLSearchParams();
-    if (municipio) params.set("municipio", municipio);
-    if (uf) params.set("uf", uf);
-    if (doenca) params.set("doenca", doenca);
-    return <Navigate to={`/atual?${params.toString()}`} replace />;
+  // Ano recente → redireciona para /atual (após todos os hooks)
+  if (anoParam >= ANO_ATUAL - 1) {
+    const p = new URLSearchParams({ uf: ufParam, doenca: doencaParam });
+    if (municipioParam) p.append("municipio", municipioParam);
+    return <Navigate to={`/atual?${p}`} replace />;
   }
 
   if (loading) {
@@ -84,23 +73,6 @@ export default function Historico() {
           <p className="text-gray-400 text-sm animate-pulse">
             ⏳ Carregando dados históricos...
           </p>
-        </div>
-      </>
-    );
-  }
-
-  if (erro) {
-    return (
-      <>
-        <TopNav />
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
-          <p className="text-red-500 text-sm">{erro}</p>
-          <button
-            onClick={() => navigate("/home")}
-            className="text-xs text-gray-500 hover:text-red-500 transition"
-          >
-            ← Voltar à busca
-          </button>
         </div>
       </>
     );
@@ -120,33 +92,42 @@ export default function Historico() {
     <div className="min-h-screen bg-slate-50">
       <TopNav />
 
-      {/* Breadcrumb */}
-      <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between">
-        <p className="text-xs text-slate-400">
-          {perfil?.municipio} · {perfil?.uf} · {perfil?.doenca} · {perfil?.ano || ano}
-        </p>
-        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-medium">
-          📚 Modo Histórico
-        </span>
+      {/* Cabeçalho histórico — fundo neutro slate (não vermelho) */}
+      <div className="bg-slate-700 text-white px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-300 uppercase tracking-wider mb-0.5">
+              📚 Modo Histórico
+            </p>
+            <h1 className="text-lg font-bold">
+              {perfil?.municipio} · {perfil?.uf}
+            </h1>
+            <p className="text-sm text-slate-300">
+              {perfil?.doenca?.charAt(0).toUpperCase() + perfil?.doenca?.slice(1)} — {perfil?.ano || anoParam}
+            </p>
+          </div>
+          <div className="text-right hidden sm:block">
+            <p className="text-xs text-slate-400">Total de casos</p>
+            <p className="text-2xl font-black">
+              {perfil?.total?.toLocaleString("pt-BR") ?? "—"}
+            </p>
+            <p className="text-xs text-slate-300">{perfil?.classificacao}</p>
+          </div>
+        </div>
       </div>
-
-      {/* 1. Cabeçalho com alerta */}
-      <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
 
-        {/* Aviso de modo histórico */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-          📚 Você está visualizando dados históricos de{" "}
-          <strong>{perfil?.ano || ano}</strong>. Para ver a situação atual e
-          previsões, use a aba{" "}
-          <strong>Atual & Previsão</strong>.
-        </div>
+        {/* 1. Análise da IA — ao topo */}
+        <section>
+          <SectionTitle icone="🤖" titulo="Análise de IA — período histórico" />
+          <IAHistorico textoIa={dados?.textoIa} ano={perfil?.ano || anoParam} />
+        </section>
 
         {/* 2. KPIs históricos grandes */}
         <KpisHistorico perfil={perfilMapped} />
 
-        {/* 3. KPIs secundários — incidência, classificação, semana de pico */}
+        {/* 3. KPIs secundários — incidência, classificação */}
         <KpiCards perfil={perfilMapped} modoHistorico={true} />
 
         {/* 4. Comparação interanual — barras Chart.js */}
@@ -154,7 +135,7 @@ export default function Historico() {
           <SectionTitle icone="📊" titulo="Comparação anual (últimos 5 anos)" />
           <ComparacaoAnual
             coIbge={perfil?.coIbge}
-            anoBase={Number(perfil?.ano || ano)}
+            anoBase={Number(perfil?.ano || anoParam)}
           />
         </section>
 
@@ -181,18 +162,6 @@ export default function Historico() {
             <TabelaRanking ranking={rankingEstado} />
           </section>
         )}
-
-        {/* 7. Análise da IA sobre o período histórico */}
-        <section>
-          <SectionTitle icone="🤖" titulo="Análise de IA — período histórico" />
-          <IAHistorico textoIa={dados?.textoIa} ano={perfil?.ano || ano} />
-        </section>
-
-        {/* 8. Resumo histórico — IA sem encaminhamento */}
-        <section>
-          <SectionTitle icone="📋" titulo="Resumo histórico" />
-          <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
-        </section>
 
       </div>
     </div>

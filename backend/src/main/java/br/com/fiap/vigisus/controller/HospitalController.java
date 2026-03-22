@@ -31,4 +31,12 @@ public class HospitalController {
 
         return encaminhamentoService.buscarHospitais(municipio, tpLeito, minLeitosSus).getHospitais();
     }
+
+    @GetMapping("/capitais")
+    @Operation(summary = "Lista principais hospitais das capitais estaduais")
+    public List<EncaminhamentoResponse.HospitalDTO> getHospitaisCapitais(
+            @RequestParam(required = false) String uf) {
+        
+        return encaminhamentoService.buscarHospitaisDasCapitais(uf);
+    }
 }

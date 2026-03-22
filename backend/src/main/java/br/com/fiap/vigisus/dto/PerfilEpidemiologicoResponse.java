@@ -27,6 +27,9 @@ public class PerfilEpidemiologicoResponse {
     // Trend calculated by comparing last 4 weeks vs previous 4 weeks
     private String tendencia;
 
+    // Current year's weekly data (semana epidemiológica → casos)
+    private List<SemanaDTO> semanas;
+
     // Previous year's weekly data for comparative chart
     private List<SemanaDTO> semanasAnoAnterior;
 

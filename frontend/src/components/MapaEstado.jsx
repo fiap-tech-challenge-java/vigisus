@@ -62,32 +62,26 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
 
   // Monta mapa de classificação por coIbge (normalizado para 7 dígitos)
   const classificacaoMap = {};
-  (ranking || []).forEach(m => {
+  (ranking || []).forEach(item => {
     const cod =
-      m.coIbge ||
-      m.co_ibge ||
-      m.coMunicipio ||
-      m.co_municipio ||
-      m.municipioCodigo ||
-      m.codigo ||
-      m.ibge;
+      item.coIbge      ?? item.co_ibge     ?? item.coMunicipio ??
+      item.co_municipio ?? item.codigo     ?? item.ibge;
+
     const classif =
-      m.classificacao ||
-      m.classification ||
-      m.status;
+      item.classificacao ?? item.classification ?? item.status;
+
     if (cod && classif) {
-      const codStr = String(cod).padStart(7, '0');
-      classificacaoMap[codStr] = classif;
+      classificacaoMap[String(cod).padStart(7, "0")] = classif;
     }
   });
 
   useEffect(() => {
     if (ranking?.length > 0) {
-      console.log("=== DEBUG MAPA ===");
-      console.log("Exemplo item ranking:", ranking[0]);
-      console.log("Chaves disponíveis:", Object.keys(ranking[0]));
+      console.log("Ranking item[0]:", ranking[0]);
+      console.log("classificacaoMap sample:",
+        Object.entries(classificacaoMap).slice(0, 3));
     }
-  }, [ranking]);
+  }, [ranking]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const estilizarFeature = (feature) => {
     // O GeoJSON do IBGE tem o código do município em properties.codarea (7 dígitos)
@@ -97,7 +91,7 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
 
     return {
       fillColor: COR_MAPA[classif] || COR_MAPA.SEM_DADO,
-      fillOpacity: classif === "SEM_DADO" ? 0.2 : 0.75,
+      fillOpacity: classif === "SEM_DADO" ? 0.15 : 0.75,
       color: isDestaque ? "#1E40AF" : "#FFFFFF",
       weight: isDestaque ? 3 : 0.5,
     };

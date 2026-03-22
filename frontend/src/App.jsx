@@ -1,23 +1,17 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Home from './pages/Home';
-import Atual from './pages/Atual';
-import Historico from './pages/Historico';
-import Resultado from './pages/Resultado';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Atual     from "./pages/Atual";
+import Historico from "./pages/Historico";
+// import Home from "./pages/Home"; // COMENTADO — não deletar
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/atual" replace />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/atual" element={<Atual />} />
+        <Route path="/"          element={<Navigate to="/atual" replace />} />
+        <Route path="/atual"     element={<Atual />} />
         <Route path="/historico" element={<Historico />} />
-        <Route path="/resultado" element={<Resultado />} />
-        <Route path="*" element={<Navigate to="/home" replace />} />
+        <Route path="*"          element={<Navigate to="/atual" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
-export default App;

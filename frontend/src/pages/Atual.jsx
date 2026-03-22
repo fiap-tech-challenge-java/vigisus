@@ -1,20 +1,18 @@
-import React, { useEffect, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
 import OQueFazerAgora from "../components/OQueFazerAgora";
 import KpiCards from "../components/KpiCards";
-import InterpretacaoOperacional from "../components/InterpretacaoOperacional";
 import StatusRapido from "../components/StatusRapido";
 import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
 import RiscoFuturo from "../components/RiscoFuturo";
 import MapaEstado from "../components/MapaEstado";
 import MapaHospitais from "../components/MapaHospitais";
 import ResumoIa from "../components/ResumoIa";
-import { buscarPorPergunta, buscarRankingEstado, buscarSituacaoAtual } from "../services/api";
+import { buscarMunicipio, buscarRankingEstado, buscarBrasil, buscarHospitaisCapitais } from "../services/api";
 
-const DEFAULT_UF = "MG";
-const DEFAULT_DOENCA = "dengue";
+const ANO_ATUAL = new Date().getFullYear();
 
 function SectionTitle({ icone, titulo }) {
   return (
@@ -59,70 +57,185 @@ function mapHospital(h) {
 }
 
 export default function Atual() {
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const municipio = searchParams.get("municipio");
-  const uf = searchParams.get("uf");
-  const doenca = searchParams.get("doenca") || DEFAULT_DOENCA;
+  const hasUrlParams   = !!searchParams.get("municipio") || !!searchParams.get("uf");
+  const municipioParam = searchParams.get("municipio");
+  const ufParam        = searchParams.get("uf")        || "MG";
+  const doencaParam    = searchParams.get("doenca")    || "dengue";
 
-  // Track whether the initial navigation state was already consumed, so we
-  // skip a redundant fetch on first render but reload whenever params change.
-  const initialStateConsumed = React.useRef(false);
-
-  const [dados, setDados] = useState(location.state?.dados || null);
-  const [loadingDados, setLoadingDados] = useState(!location.state?.dados);
-  const [erroDados, setErroDados] = useState(false);
+  const [dados, setDados]                = useState(null);
   const [rankingEstado, setRankingEstado] = useState([]);
-  const [loadingRanking, setLoadingRanking] = useState(false);
-  const [erroRanking, setErroRanking] = useState(false);
+  const [loading, setLoading]            = useState(false);
+  const [erro, setErro]                  = useState(null);
+  // "pending" = aguardando geo | "city" = carregar dados | "brasil" = estado neutro
+  const [geoState, setGeoState]          = useState(hasUrlParams ? "city" : "pending");
 
-  // Carrega dados dos params ou via default (top cidade de MG)
+  // Quando usuário pesquisa via TopNav enquanto estava no estado brasil
   useEffect(() => {
-    // Skip the first run if we already have data from navigation state
-    if (!initialStateConsumed.current && location.state?.dados) {
-      initialStateConsumed.current = true;
+    if (hasUrlParams && geoState === "brasil") {
+      setGeoState("city");
+    }
+  }, [hasUrlParams, geoState]);
+
+  // Tenta detectar a cidade real do usuário uma única vez na abertura da página
+  useEffect(() => {
+    if (hasUrlParams) return; // já tem params → geoState já é "city"
+
+    if (!navigator.geolocation) {
+      setGeoState("brasil");
       return;
     }
-    initialStateConsumed.current = true;
 
-    const carregarDados = async () => {
-      setLoadingDados(true);
-      setErroDados(false);
-      const ANO_ATUAL = new Date().getFullYear();
-      try {
-        let pergunta;
-        if (municipio && uf) {
-          pergunta = `${doenca} em ${municipio} ${uf} ${ANO_ATUAL}`;
-        } else {
-          // Sem params: carrega MG via ranking
-          const ranking = await buscarSituacaoAtual(DEFAULT_UF, 1);
-          const topCidade = ranking?.ranking?.[0];
-          const cidadeDefault = topCidade?.municipio || "Belo Horizonte";
-          pergunta = `${DEFAULT_DOENCA} em ${cidadeDefault} ${DEFAULT_UF} ${ANO_ATUAL}`;
+    // Timeout de 5s → se geo demorar, exibe estado Brasil neutro
+    const timer = setTimeout(() => setGeoState("brasil"), 5000);
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        clearTimeout(timer);
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse` +
+            `?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+          );
+          const data = await res.json();
+          const city =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.municipality;
+          // ISO3166-2-lvl4 retorna "BR-MG", "BR-SP", etc.
+          const uf = (data.address?.["ISO3166-2-lvl4"] || "").replace("BR-", "");
+          if (city && uf) {
+            setSearchParams({ municipio: city, uf, doenca: "dengue" }, { replace: true });
+            setGeoState("city");
+          } else {
+            setGeoState("brasil"); // coords válidas mas sem cidade reconhecida
+          }
+        } catch {
+          setGeoState("brasil"); // Nominatim falhou
         }
-        const r = await buscarPorPergunta(pergunta);
-        setDados(r.data);
-      } catch {
-        setErroDados(true);
-      } finally {
-        setLoadingDados(false);
-      }
-    };
+      },
+      () => {
+        // Permissão negada ou erro de hardware → estado neutro Brasil
+        clearTimeout(timer);
+        setGeoState("brasil");
+      },
+      { timeout: 4500, maximumAge: 60_000 }
+    );
 
-    carregarDados();
-  }, [municipio, uf, doenca]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Carrega ranking do estado separadamente
+  // Carrega dados somente quando geoState === "city" ou geoState === "brasil"
   useEffect(() => {
-    if (!dados?.perfil?.uf) return;
-    setLoadingRanking(true);
-    setErroRanking(false);
-    buscarRankingEstado(dados.perfil.uf, dados.perfil.ano)
-      .then(r => setRankingEstado(r?.ranking || []))
-      .catch(() => setErroRanking(true))
-      .finally(() => setLoadingRanking(false));
-  }, [dados]);
+    if (geoState === "city") {
+      if (municipioParam) {
+        carregar(municipioParam, ufParam, doencaParam);
+      } else if (ufParam) {
+        carregarEstado(ufParam, doencaParam);
+      }
+    } else if (geoState === "brasil" && !hasUrlParams) {
+      carregarBrasil(doencaParam);
+    }
+  }, [municipioParam, ufParam, doencaParam, geoState, hasUrlParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const carregar = async (municipio, uf, doenca) => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const resp = await buscarMunicipio(municipio, uf, doenca, ANO_ATUAL);
+      setDados(resp);
+      const ufFinal = resp?.perfil?.uf || uf;
+      const ranking = await buscarRankingEstado(ufFinal, ANO_ATUAL);
+      setRankingEstado(ranking?.ranking || []);
+    } catch {
+      setErro("Município não encontrado. Verifique o nome e o estado.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const carregarBrasil = async (doenca) => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const resp = await buscarBrasil(doenca, ANO_ATUAL);
+      setDados({
+        perfil: {
+          municipio: "Brasil",
+          uf: "BR",
+          total: resp.totalCasos,
+          incidencia: resp.incidencia,
+          classificacao: resp.classificacao,
+          tendencia: resp.tendencia,
+          semanas: resp.semanas,
+          semanasAnoAnterior: resp.semanasAnoAnterior,
+          doenca: doenca,
+          ano: ANO_ATUAL,
+        },
+        textoIa: resp.textoIa,
+        risco: null,
+        encaminhamento: { hospitais: (resp.hospitais || []).map(mapHospital) },
+        estadosPiores: resp.estadosPiores,
+        municipiosPiores: resp.municipiosPiores,
+      });
+      setRankingEstado(resp.estadosPiores || []);
+    } catch (e) {
+      console.error("Erro ao carregar dados do Brasil:", e);
+      setErro("Erro ao carregar dados do Brasil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const carregarEstado = async (uf, doenca) => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const ranking = await buscarRankingEstado(uf, ANO_ATUAL);
+      const hospitais = await buscarHospitaisCapitais(uf);
+      
+      // Calcula agregado do estado a partir do ranking
+      const totalCasos = ranking?.ranking?.reduce((sum, m) => sum + (m.totalCasos || 0), 0) || 0;
+      const populacao = ranking?.ranking?.reduce((sum, m) => sum + (m.populacao || 0), 0) || 1;
+      const incidencia = populacao > 0 ? (totalCasos / populacao) * 100_000 : 0;
+      
+      const obterClassificacao = (incid) => {
+        if (incid < 50) return "BAIXO";
+        if (incid < 100) return "MODERADO";
+        if (incid <= 300) return "ALTO";
+        return "EPIDEMIA";
+      };
+      
+      setDados({
+        perfil: {
+          municipio: uf,
+          uf: uf,
+          total: totalCasos,
+          incidencia: incidencia,
+          classificacao: obterClassificacao(incidencia),
+          tendencia: "ESTAVEL",
+          semanas: [],
+          semanasAnoAnterior: [],
+          doenca: doenca,
+          ano: ANO_ATUAL,
+        },
+        textoIa: `Estado ${uf} registrou ${totalCasos} casos de ${doenca} em ${ANO_ATUAL}, com incidência de ${incidencia.toFixed(1)} por 100 mil habitantes.`,
+        risco: null,
+        encaminhamento: { hospitais: (hospitais || []).map(mapHospital) },
+      });
+      setRankingEstado(ranking?.ranking || []);
+    } catch (e) {
+      console.error("Erro ao carregar dados do estado:", e);
+      setErro("Estado não encontrado. Verifique.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onBuscar = (municipio, uf, doenca) => {
+    setSearchParams({ municipio, uf, doenca });
+  };
 
   const perfil = dados?.perfil || {};
 
@@ -142,9 +255,67 @@ export default function Atual() {
       }
     : null;
 
+  // Estado: aguardando geolocalização
+  if (geoState === "pending") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <TopNav />
+        <div className="flex flex-col items-center justify-center h-80 gap-3">
+          <p className="text-gray-400 text-sm animate-pulse">
+            🔍 Detectando sua localização...
+          </p>
+          <p className="text-xs text-gray-300">
+            Ou pesquise um município acima
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Estado: localização negada / indisponível → carrega dados agregados do Brasil
+  if (geoState === "brasil") {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <TopNav />
+          <div className="flex flex-col items-center justify-center h-[70vh] gap-5">
+            <p className="text-gray-400 text-sm animate-pulse">
+              🔍 Carregando dados do Brasil...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (erro) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <TopNav />
+          <div className="flex flex-col items-center justify-center h-[70vh] gap-5 text-center px-6">
+            <div className="text-6xl">🇧🇷</div>
+            <h2 className="text-xl font-bold text-gray-700">
+              Dados Indisponíveis
+            </h2>
+            <p className="text-sm text-gray-500 max-w-sm">
+              {erro}
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
+      {erro && (
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4
+                          text-sm text-red-600">
+            {erro}
+          </div>
+        </div>
+      )}
 
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center justify-between">
@@ -159,11 +330,11 @@ export default function Atual() {
       </div>
 
       {/* 1. Cabeçalho com alerta */}
-      {loadingDados ? (
+      {loading ? (
         <div className="px-6 py-5 bg-gray-200 animate-pulse">
           <div className="max-w-6xl mx-auto h-16 bg-gray-300 rounded" />
         </div>
-      ) : erroDados ? (
+      ) : erro ? (
         <div className="px-6 py-5">
           <SectionErro />
         </div>
@@ -175,23 +346,13 @@ export default function Atual() {
 
         {/* 2. O que fazer agora — tomada de decisão com IA */}
         <OQueFazerAgora perfil={perfil} textoIa={dados?.textoIa} />
-        {/* 2. Interpretação operacional — tomada de decisão */}
-        <section>
-          {loadingDados ? (
-            <SectionSkeleton linhas={4} />
-          ) : erroDados ? (
-            <SectionErro />
-          ) : (
-            <InterpretacaoOperacional perfil={perfil} />
-          )}
-        </section>
 
         {/* 3. Status rápido — 3 métricas compactas */}
         <StatusRapido perfil={perfilMapped} risco={dados?.risco} />
         {/* 3. KPIs */}
-        {loadingDados ? (
+        {loading ? (
           <SectionSkeleton linhas={2} />
-        ) : erroDados ? (
+        ) : erro ? (
           <SectionErro />
         ) : (
           <KpiCards perfil={perfilMapped} risco={dados?.risco} />
@@ -200,9 +361,9 @@ export default function Atual() {
         {/* 4. Curva epidemiológica */}
         <section>
           <SectionTitle icone="📈" titulo="Evolução dos casos" />
-          {loadingDados ? (
+          {loading ? (
             <SectionSkeleton linhas={5} />
-          ) : erroDados ? (
+          ) : erro ? (
             <SectionErro />
           ) : (
             <CurvaEpidemiologica perfil={perfil} />
@@ -215,9 +376,9 @@ export default function Atual() {
             icone="🌡️"
             titulo={`Risco climático — ${formatarData(hoje)} a ${formatarData(em14dias)}`}
           />
-          {loadingDados ? (
+          {loading ? (
             <SectionSkeleton linhas={2} />
-          ) : erroDados ? (
+          ) : erro ? (
             <SectionErro />
           ) : (
             <RiscoFuturo risco={dados?.risco} />
@@ -227,9 +388,9 @@ export default function Atual() {
         {/* 6. Distribuição regional */}
         <section>
           <SectionTitle icone="🗺️" titulo="Distribuição regional" />
-          {loadingRanking ? (
+          {loading ? (
             <SectionSkeleton linhas={4} />
-          ) : erroRanking ? (
+          ) : erro ? (
             <SectionErro />
           ) : (
             <MapaEstado
@@ -243,9 +404,9 @@ export default function Atual() {
         {/* 7. Infraestrutura / encaminhamento */}
         <section>
           <SectionTitle icone="🏥" titulo="Infraestrutura disponível" />
-          {loadingDados ? (
+          {loading ? (
             <SectionSkeleton linhas={3} />
-          ) : erroDados ? (
+          ) : erro ? (
             <SectionErro />
           ) : (
             <MapaHospitais
@@ -258,9 +419,9 @@ export default function Atual() {
         {/* 8. Resumo IA */}
         <section>
           <SectionTitle icone="📋" titulo="Resumo operacional" />
-          {loadingDados ? (
+          {loading ? (
             <SectionSkeleton linhas={4} />
-          ) : erroDados ? (
+          ) : erro ? (
             <SectionErro />
           ) : (
             <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
