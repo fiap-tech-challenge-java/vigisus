@@ -2,13 +2,12 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
-import InterpretacaoOperacional from "../components/InterpretacaoOperacional";
+import OQueFazerAgora from "../components/OQueFazerAgora";
 import KpiCards from "../components/KpiCards";
 import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
 import RiscoFuturo from "../components/RiscoFuturo";
 import MapaEstado from "../components/MapaEstado";
 import MapaHospitais from "../components/MapaHospitais";
-import ResumoIa from "../components/ResumoIa";
 import { buscarPorPergunta, buscarRankingEstado } from "../services/api";
 
 function SectionTitle({ icone, titulo }) {
@@ -138,8 +137,8 @@ export default function Atual() {
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
 
-        {/* 2. Interpretação operacional — tomada de decisão */}
-        <InterpretacaoOperacional perfil={perfil} />
+        {/* 2. O que fazer agora — tomada de decisão com IA */}
+        <OQueFazerAgora perfil={perfil} textoIa={dados?.textoIa} />
 
         {/* 3. KPIs */}
         <KpiCards perfil={perfilMapped} risco={dados?.risco} />
@@ -176,12 +175,6 @@ export default function Atual() {
             perfil={perfilMapped}
             encaminhamento={encaminhamentoMapped}
           />
-        </section>
-
-        {/* 8. Resumo IA */}
-        <section>
-          <SectionTitle icone="📋" titulo="Resumo operacional" />
-          <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
         </section>
 
       </div>
