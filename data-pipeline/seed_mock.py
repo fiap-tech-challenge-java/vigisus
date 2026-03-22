@@ -15,8 +15,9 @@ Dados inseridos:
 import logging
 import math
 import random
+import sys
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, exc
 
 from config import DB_URL
 
@@ -336,6 +337,23 @@ def seed_casos_dengue(conn) -> int:
 
 
 def run() -> None:
+    # Verificar conexão com banco de dados
+    try:
+        engine = create_engine(DB_URL)
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except exc.OperationalError as e:
+        logger.error("❌ Erro: Não foi possível conectar ao banco de dados PostgreSQL.")
+        logger.error("")
+        logger.error("Por favor, inicie o Docker com o comando:")
+        logger.error("")
+        logger.error("  docker-compose up -d postgres")
+        logger.error("")
+        logger.error("E aguarde alguns segundos para o banco de dados ficar pronto.")
+        logger.error("")
+        logger.error("Detalhes do erro: %s", str(e).split('\n')[0] if '\n' in str(e) else str(e))
+        sys.exit(1)
+    
     engine = create_engine(DB_URL)
     with engine.begin() as conn:
         n_mun = seed_municipios(conn)
