@@ -63,16 +63,28 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
   // Monta mapa de classificação por coIbge (normalizado para 7 dígitos)
   const classificacaoMap = {};
   (ranking || []).forEach(m => {
-    const cod = m.coIbge || m.co_ibge || m.codigo || m.ibge;
-    if (cod) {
+    const cod =
+      m.coIbge ||
+      m.co_ibge ||
+      m.coMunicipio ||
+      m.co_municipio ||
+      m.municipioCodigo ||
+      m.codigo ||
+      m.ibge;
+    const classif =
+      m.classificacao ||
+      m.classification ||
+      m.status;
+    if (cod && classif) {
       const codStr = String(cod).padStart(7, '0');
-      classificacaoMap[codStr] = m.classificacao;
+      classificacaoMap[codStr] = classif;
     }
   });
 
   useEffect(() => {
     if (ranking?.length > 0) {
-      console.log("Primeiro item do ranking:", ranking[0]);
+      console.log("=== DEBUG MAPA ===");
+      console.log("Exemplo item ranking:", ranking[0]);
       console.log("Chaves disponíveis:", Object.keys(ranking[0]));
     }
   }, [ranking]);
@@ -84,8 +96,8 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
     const isDestaque = cod === String(coIbgeDestaque || "").padStart(7, '0');
 
     return {
-      fillColor: COR_MAPA[classif],
-      fillOpacity: 0.7,
+      fillColor: COR_MAPA[classif] || COR_MAPA.SEM_DADO,
+      fillOpacity: classif === "SEM_DADO" ? 0.2 : 0.75,
       color: isDestaque ? "#1E40AF" : "#FFFFFF",
       weight: isDestaque ? 3 : 0.5,
     };
@@ -95,7 +107,9 @@ export default function MapaEstado({ uf = "MG", coIbgeDestaque, ranking }) {
     const cod = String(feature?.properties?.codarea || "").padStart(7, '0');
     const classif = classificacaoMap[cod];
     const municipio = (ranking || []).find(m => {
-      const mCod = m.coIbge || m.co_ibge || m.codigo || m.ibge;
+      const mCod =
+        m.coIbge || m.co_ibge || m.coMunicipio || m.co_municipio ||
+        m.municipioCodigo || m.codigo || m.ibge;
       return mCod && String(mCod).padStart(7, '0') === cod;
     });
 

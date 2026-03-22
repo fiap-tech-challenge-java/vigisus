@@ -17,6 +17,11 @@ function semanaParaMes(semana) {
   return MESES[mes] || "";
 }
 
+/** Retorna o número de casos de uma entrada de semana, aceitando campos alternativos. */
+function getCasosFromSemana(s) {
+  return s.casos ?? s.totalCasos ?? 0;
+}
+
 export default function KpisHistorico({ perfil }) {
   if (!perfil) return null;
 
@@ -24,11 +29,15 @@ export default function KpisHistorico({ perfil }) {
   const semanas = perfil.semanas || [];
 
   const picoDado = semanas.length
-    ? semanas.reduce((prev, curr) => (curr.casos > prev.casos ? curr : prev), semanas[0])
+    ? semanas.reduce((prev, curr) =>
+        getCasosFromSemana(curr) > getCasosFromSemana(prev) ? curr : prev
+      , semanas[0])
     : null;
 
-  const picoCasos = picoDado?.casos ?? null;
-  const picoSemana = picoDado?.semanaEpi ?? null;
+  const picoCasos = picoDado != null ? getCasosFromSemana(picoDado) || null : null;
+  const picoSemana = picoDado != null
+    ? (picoDado.semanaEpi ?? picoDado.semana_epi ?? picoDado.semana ?? null)
+    : null;
   const picoMes = semanaParaMes(picoSemana);
 
   const populacao = perfil.populacao || null;

@@ -14,7 +14,8 @@ const DOENCAS = [
   { value: "zika",        label: "Zika" },
 ];
 
-const ANOS = [2021, 2022, 2023, 2024, 2025];
+const ANO_ATUAL = new Date().getFullYear();
+const ANOS = Array.from({ length: ANO_ATUAL - 2020 }, (_, i) => 2021 + i);
 
 const COR_CARD = {
   EPIDEMIA: { borda: "border-red-400",    fundo: "bg-red-50",    texto: "text-red-700",    icone: "🔴" },
@@ -66,7 +67,7 @@ export default function Home() {
 
       const anoAtual = new Date().getFullYear();
       const anoResult = overrideAno != null ? overrideAno : perfil.ano;
-      const isHistorico = anoResult && Number(anoResult) < anoAtual - 1;
+      const isHistorico = anoResult && Number(anoResult) <= anoAtual - 2;
 
       const params = new URLSearchParams();
       if (perfil.municipio) params.set("municipio", perfil.municipio);

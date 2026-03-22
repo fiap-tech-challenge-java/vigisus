@@ -9,11 +9,12 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Navigate to="/atual" replace />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/atual" element={<Atual />} />
         <Route path="/historico" element={<Historico />} />
         <Route path="/resultado" element={<Resultado />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </BrowserRouter>
   );

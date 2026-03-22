@@ -89,16 +89,17 @@ export default function Atual() {
     const carregarDados = async () => {
       setLoadingDados(true);
       setErroDados(false);
+      const ANO_ATUAL = new Date().getFullYear();
       try {
         let pergunta;
         if (municipio && uf) {
-          pergunta = `${doenca} em ${municipio} ${uf}`;
+          pergunta = `${doenca} em ${municipio} ${uf} ${ANO_ATUAL}`;
         } else {
           // Sem params: carrega MG via ranking
           const ranking = await buscarSituacaoAtual(DEFAULT_UF, 1);
           const topCidade = ranking?.ranking?.[0];
           const cidadeDefault = topCidade?.municipio || "Belo Horizonte";
-          pergunta = `${DEFAULT_DOENCA} em ${cidadeDefault} ${DEFAULT_UF}`;
+          pergunta = `${DEFAULT_DOENCA} em ${cidadeDefault} ${DEFAULT_UF} ${ANO_ATUAL}`;
         }
         const r = await buscarPorPergunta(pergunta);
         setDados(r.data);
