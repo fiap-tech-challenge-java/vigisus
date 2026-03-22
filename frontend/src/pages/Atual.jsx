@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
 import InterpretacaoOperacional from "../components/InterpretacaoOperacional";
-import KpiCards from "../components/KpiCards";
+import StatusRapido from "../components/StatusRapido";
 import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
 import RiscoFuturo from "../components/RiscoFuturo";
 import MapaEstado from "../components/MapaEstado";
@@ -141,8 +141,8 @@ export default function Atual() {
         {/* 2. Interpretação operacional — tomada de decisão */}
         <InterpretacaoOperacional perfil={perfil} />
 
-        {/* 3. KPIs */}
-        <KpiCards perfil={perfilMapped} risco={dados?.risco} />
+        {/* 3. Status rápido — 3 métricas compactas */}
+        <StatusRapido perfil={perfilMapped} risco={dados?.risco} />
 
         {/* 4. Curva epidemiológica */}
         <section>
