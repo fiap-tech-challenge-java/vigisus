@@ -3,8 +3,12 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
 import KpiCards from "../components/KpiCards";
+import KpisHistorico from "../components/KpisHistorico";
+import ComparacaoAnual from "../components/ComparacaoAnual";
 import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
 import MapaEstado from "../components/MapaEstado";
+import TabelaRanking from "../components/TabelaRanking";
+import IAHistorico from "../components/IAHistorico";
 import ResumoIa from "../components/ResumoIa";
 import { buscarPorPergunta, buscarRankingEstado } from "../services/api";
 
@@ -21,68 +25,6 @@ function SectionTitle({ icone, titulo }) {
   );
 }
 
-function ComparacaoAnual({ perfil }) {
-  if (!perfil?.semanasAnoAnterior?.length) return null;
-
-  const totalAtual = perfil.totalCasos || 0;
-  const totalAnterior = perfil.semanasAnoAnterior.reduce((s, x) => s + x.casos, 0);
-  const variacao = totalAnterior > 0
-    ? ((totalAtual - totalAnterior) / totalAnterior * 100).toFixed(1)
-    : null;
-
-  const picoAtual = perfil.semanas?.length
-    ? perfil.semanas.reduce((prev, curr) => (curr.casos > prev.casos ? curr : prev), perfil.semanas[0])
-    : null;
-  const picoAnterior = perfil.semanasAnoAnterior.reduce(
-    (prev, curr) => (curr.casos > prev.casos ? curr : prev),
-    perfil.semanasAnoAnterior[0]
-  );
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mx-6 max-w-6xl md:mx-auto">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">
-        📊 Comparação interanual
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="text-center">
-          <p className="text-xs text-slate-600 font-medium mb-1">{perfil.ano}</p>
-          <p className="text-2xl font-black text-slate-700">
-            {totalAtual.toLocaleString("pt-BR")}
-          </p>
-          <p className="text-xs text-slate-500">casos totais</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-slate-600 font-medium mb-1">{perfil.ano - 1}</p>
-          <p className="text-2xl font-black text-slate-400">
-            {totalAnterior.toLocaleString("pt-BR")}
-          </p>
-          <p className="text-xs text-slate-500">casos totais</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-slate-600 font-medium mb-1">Variação</p>
-          <p className={`text-2xl font-black ${
-            variacao === null ? "text-slate-400"
-            : Number(variacao) > 0 ? "text-red-500" : "text-green-600"
-          }`}>
-            {variacao !== null
-              ? `${Number(variacao) > 0 ? "+" : ""}${variacao}%`
-              : "—"}
-          </p>
-          <p className="text-xs text-slate-500">ano a ano</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-slate-600 font-medium mb-1">Semanas de pico</p>
-          <p className="text-sm font-bold text-slate-600">
-            {picoAtual ? `Sem. ${picoAtual.semanaEpi}` : "—"}
-            <span className="text-slate-300 mx-1">/</span>
-            <span className="text-slate-400">Sem. {picoAnterior.semanaEpi}</span>
-          </p>
-          <p className="text-xs text-slate-500">{perfil.ano} / {perfil.ano - 1}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Historico() {
   const location = useLocation();
@@ -190,19 +132,28 @@ export default function Historico() {
           <strong>Atual & Previsão</strong>.
         </div>
 
-        {/* 2. KPIs históricos — 4º card mostra semana de pico em vez de risco futuro */}
+        {/* 2. KPIs históricos grandes */}
+        <KpisHistorico perfil={perfilMapped} />
+
+        {/* 3. KPIs secundários — incidência, classificação, semana de pico */}
         <KpiCards perfil={perfilMapped} modoHistorico={true} />
 
-        {/* 3. Comparação interanual */}
-        <ComparacaoAnual perfil={perfilMapped} />
+        {/* 4. Comparação interanual — barras Chart.js */}
+        <section>
+          <SectionTitle icone="📊" titulo="Comparação anual (últimos 5 anos)" />
+          <ComparacaoAnual
+            coIbge={perfil?.coIbge}
+            anoBase={Number(perfil?.ano || ano)}
+          />
+        </section>
 
-        {/* 4. Curva epidemiológica */}
+        {/* 5. Curva epidemiológica */}
         <section>
           <SectionTitle icone="📈" titulo="Evolução dos casos" />
           <CurvaEpidemiologica perfil={perfil} />
         </section>
 
-        {/* 5. Distribuição regional */}
+        {/* 6. Distribuição regional */}
         <section>
           <SectionTitle icone="🗺️" titulo="Distribuição regional" />
           <MapaEstado
@@ -212,7 +163,21 @@ export default function Historico() {
           />
         </section>
 
-        {/* 6. Resumo histórico — IA sem encaminhamento */}
+        {/* 7. Ranking de municípios do estado */}
+        {rankingEstado?.length > 0 && (
+          <section>
+            <SectionTitle icone="🏆" titulo="Ranking de municípios — situação do estado" />
+            <TabelaRanking ranking={rankingEstado} />
+          </section>
+        )}
+
+        {/* 7. Análise da IA sobre o período histórico */}
+        <section>
+          <SectionTitle icone="🤖" titulo="Análise de IA — período histórico" />
+          <IAHistorico textoIa={dados?.textoIa} ano={perfil?.ano || ano} />
+        </section>
+
+        {/* 8. Resumo histórico — IA sem encaminhamento */}
         <section>
           <SectionTitle icone="📋" titulo="Resumo histórico" />
           <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
