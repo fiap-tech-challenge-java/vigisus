@@ -56,6 +56,9 @@ function Resultado() {
   const em14dias = new Date(hoje.getTime() + 14 * 24 * 60 * 60 * 1000);
   const formatarData = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 
+  const ANO_ATUAL = new Date().getFullYear();
+  const mostrarRiscoFuturo = perfil?.ano === ANO_ATUAL || perfil?.ano === ANO_ATUAL - 1;
+
   // Map perfil fields to the shape expected by ResumoIa and MapaHospitais
   const perfilMapped = {
     ...perfil,
@@ -106,10 +109,16 @@ function Resultado() {
         </section>
 
         {/* 5. RISCO FUTURO — 14 bolinhas */}
-        <section>
-          <SectionTitle icone="🌡️" titulo={`Risco climático — ${formatarData(hoje)} a ${formatarData(em14dias)}`} />
-          <RiscoFuturo risco={dados?.risco} />
-        </section>
+        {mostrarRiscoFuturo ? (
+          <section>
+            <SectionTitle icone="🌡️" titulo={`Risco climático — ${formatarData(hoje)} a ${formatarData(em14dias)}`} />
+            <RiscoFuturo risco={dados?.risco} />
+          </section>
+        ) : (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-400 text-center">
+            Previsão de risco disponível apenas para consultas do período atual.
+          </div>
+        )}
 
         {/* 6. VISÃO MACRO — mapa do estado */}
         <section>

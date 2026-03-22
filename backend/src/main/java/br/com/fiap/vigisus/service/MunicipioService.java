@@ -22,4 +22,12 @@ public class MunicipioService {
     public List<Municipio> listarPorUf(String uf) {
         return municipioRepository.findBySgUf(uf);
     }
+
+    public List<Municipio> buscarPorNomeEUf(String nome, String uf) {
+        return municipioRepository.findByNoMunicipioContainingIgnoreCaseAndSgUf(nome, uf);
+    }
+
+    public java.util.Optional<Municipio> buscarPorNome(String nome) {
+        return municipioRepository.findTop1ByNoMunicipioContainingIgnoreCase(nome);
+    }
 }
