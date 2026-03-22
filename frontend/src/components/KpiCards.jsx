@@ -24,9 +24,17 @@ function Card({ titulo, valor, sub, cor, extraClasses = "", children }) {
   );
 }
 
-export default function KpiCards({ perfil, risco }) {
+export default function KpiCards({ perfil, risco, modoHistorico = false }) {
   const corClassif = getCor(perfil?.classificacao);
   const corRisco   = getCor(risco?.classificacao);
+
+  // Peak week calculation for historical mode
+  const semanas = perfil?.semanas || [];
+  const picoDado = semanas.length
+    ? semanas.reduce((prev, curr) => (curr.casos > prev.casos ? curr : prev), semanas[0])
+    : null;
+  const picoValor = picoDado ? picoDado.casos : null;
+  const picoSemana = picoDado ? picoDado.semanaEpi : null;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 max-w-6xl mx-auto">
@@ -67,12 +75,21 @@ export default function KpiCards({ perfil, risco }) {
         extraClasses={`border-2 ${corClassif.borda || "border-gray-200"} ${corClassif.light || ""}`}
       />
 
-      <Card
-        titulo="Risco próx. 2 semanas"
-        valor={`${risco?.score ?? "—"}/8`}
-        sub={risco?.classificacao || ""}
-        cor={{ ...corRisco, label: risco?.classificacao }}
-      />
+      {modoHistorico ? (
+        <Card
+          titulo="Semana de pico"
+          valor={picoSemana ? `Sem. ${picoSemana}` : "—"}
+          sub={picoValor ? `${picoValor.toLocaleString("pt-BR")} casos` : ""}
+          extraClasses="border-2 border-slate-200 bg-slate-50"
+        />
+      ) : (
+        <Card
+          titulo="Risco próx. 2 semanas"
+          valor={`${risco?.score ?? "—"}/8`}
+          sub={risco?.classificacao || ""}
+          cor={{ ...corRisco, label: risco?.classificacao }}
+        />
+      )}
 
     </div>
   );
