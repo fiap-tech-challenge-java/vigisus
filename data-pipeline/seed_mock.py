@@ -4,10 +4,12 @@ Insere dados mockados com estrutura real para uso em desenvolvimento local,
 quando o FTP do DATASUS não estiver acessível.
 
 Dados inseridos:
-  - 21 municípios (MG + SP)
+  - 22 municípios (MG + SP)
   - 1 hospital por cidade + 3 originais de Lavras
   - Leitos e serviços por hospital
-  - Casos de dengue semanais para todos os municípios, anos 2021-2025
+  - Casos de dengue semanais para todos os municípios, anos 2021-2026
+    (2025: ano completo com cenários distintos por município;
+     2026: dados parciais até semana ≈12, simulando ano em curso)
 """
 
 import logging
@@ -22,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Dados de municípios — 21 cidades (MG + SP)
+# Dados de municípios — 22 cidades (MG + SP)
 # ---------------------------------------------------------------------------
 MUNICIPIOS = [
     # Minas Gerais
@@ -39,6 +41,7 @@ MUNICIPIOS = [
     {"id": 3155504, "co_ibge": "3155504", "no_municipio": "Ribeirão das Neves",   "sg_uf": "MG", "nu_latitude": -19.7706, "nu_longitude": -44.0858, "populacao": 340000},
     {"id": 3163706, "co_ibge": "3163706", "no_municipio": "Varginha",             "sg_uf": "MG", "nu_latitude": -21.5512, "nu_longitude": -45.4302, "populacao": 135000},
     {"id": 3131703, "co_ibge": "3131703", "no_municipio": "Ipatinga",             "sg_uf": "MG", "nu_latitude": -19.4683, "nu_longitude": -42.5364, "populacao": 262000},
+    {"id": 3169307, "co_ibge": "3169307", "no_municipio": "Coronel Fabriciano",   "sg_uf": "MG", "nu_latitude": -19.5186, "nu_longitude": -42.6347, "populacao": 115000},
     # São Paulo
     {"id": 3550308, "co_ibge": "3550308", "no_municipio": "São Paulo",            "sg_uf": "SP", "nu_latitude": -23.5505, "nu_longitude": -46.6333, "populacao": 12325000},
     {"id": 3509502, "co_ibge": "3509502", "no_municipio": "Campinas",             "sg_uf": "SP", "nu_latitude": -22.9056, "nu_longitude": -47.0608, "populacao": 1213000},
@@ -87,6 +90,7 @@ ESTABELECIMENTOS = [
     {"co_cnes": "9001018", "no_fantasia": "Hospital Regional Marília",      "co_municipio": "3525904", "nu_latitude": -22.2139, "nu_longitude": -49.9458, "nu_telefone": "1400000018", "tp_gestao": "M", "competencia": "202312"},
     {"co_cnes": "9001019", "no_fantasia": "Hospital Regional Sorocaba",     "co_municipio": "3557105", "nu_latitude": -23.5015, "nu_longitude": -47.4526, "nu_telefone": "1500000019", "tp_gestao": "E", "competencia": "202312"},
     {"co_cnes": "9002001", "no_fantasia": "Hospital Municipal de Ipatinga", "co_municipio": "3131703", "nu_latitude": -19.4700, "nu_longitude": -42.5400, "nu_telefone": "3138291000", "tp_gestao": "M", "competencia": "202312"},
+    {"co_cnes": "9002002", "no_fantasia": "Hospital Municipal Cel. Fabriciano", "co_municipio": "3169307", "nu_latitude": -19.5190, "nu_longitude": -42.6350, "nu_telefone": "3138261000", "tp_gestao": "M", "competencia": "202312"},
 ]
 
 # ---------------------------------------------------------------------------
@@ -133,7 +137,7 @@ for _est in ESTABELECIMENTOS:
         SERVICOS.append({"co_cnes": co, "serv_esp": "136", "class_sr": "001", "competencia": "202312"})
 
 # ---------------------------------------------------------------------------
-# Casos de dengue — 20 municípios, anos 2021-2025, sazonalidade realista
+# Casos de dengue — 22 municípios, anos 2021-2026, sazonalidade realista
 # ---------------------------------------------------------------------------
 
 BASE_CASOS = {
@@ -150,6 +154,7 @@ BASE_CASOS = {
     "3155504": 40,   # Ribeirão das Neves
     "3163706": 18,   # Varginha
     "3131703": 35,   # Ipatinga
+    "3169307": 12,   # Coronel Fabriciano
     "3550308": 800,  # São Paulo
     "3509502": 120,  # Campinas
     "3548708": 85,   # Ribeirão Preto
@@ -160,15 +165,14 @@ BASE_CASOS = {
     "3557105": 80,   # Sorocaba
 }
 
-MULT_ANO = {2021: 0.8, 2022: 1.0, 2023: 1.2, 2024: 2.5, 2025: 1.8}
+MULT_ANO = {2021: 0.8, 2022: 1.0, 2023: 1.2, 2024: 2.5}
 
 random.seed(42)
 
 CASOS_DENGUE = []
 for _co_municipio, _base in BASE_CASOS.items():
     for _ano, _mult in MULT_ANO.items():
-        _max_semana = 20 if _ano == 2025 else 52
-        for _semana in range(1, _max_semana + 1):
+        for _semana in range(1, 53):
             if _semana <= 15 or _semana >= 45:
                 _casos = int(_base * _mult * random.randint(2, 5))
             else:
@@ -181,6 +185,69 @@ for _co_municipio, _base in BASE_CASOS.items():
                     "total_casos": _casos,
                 }
             )
+
+# ---------------------------------------------------------------------------
+# 2025 — ano completo (52 semanas) com cenários distintos por município
+# Multiplicadores: EPIDEMIA ≈ 5–8×, ALTO ≈ 2.5×, MODERADO ≈ 1.2×, BAIXO ≈ 0.5×
+# ---------------------------------------------------------------------------
+_MULT_2025 = {
+    "3131307": 6.25,  # Lavras: EPIDEMIA (2.5× sobre 2024, que já era 2.5×)
+    "3106200": 2.5,   # Belo Horizonte: ALTO
+    "3131703": 8.0,   # Ipatinga: EPIDEMIA (casos mais altos que Lavras)
+    "3163706": 1.2,   # Varginha: MODERADO
+    "3550308": 2.5,   # São Paulo: ALTO
+    "3509502": 5.0,   # Campinas: EPIDEMIA
+}
+_MULT_2025_DEFAULT = 1.8
+
+for _co_municipio, _base in BASE_CASOS.items():
+    _mult = _MULT_2025.get(_co_municipio, _MULT_2025_DEFAULT)
+    for _semana in range(1, 53):
+        if _semana <= 15 or _semana >= 45:
+            _casos = int(_base * _mult * random.randint(2, 5))
+        else:
+            _casos = int(_base * _mult * random.randint(0, 1) / 4)
+        CASOS_DENGUE.append(
+            {
+                "co_municipio": _co_municipio,
+                "ano": 2025,
+                "semana_epi": _semana,
+                "total_casos": _casos,
+            }
+        )
+
+# ---------------------------------------------------------------------------
+# 2026 — ano em curso; dados apenas para semanas 1 até ≈12 (março/2026)
+# Apenas os municípios com cenário definido recebem dados de 2026
+# ---------------------------------------------------------------------------
+_SEMANA_ATUAL_2026 = 12
+
+_MULT_2026 = {
+    "3131307": 3.0,   # Lavras: ALTO
+    "3106200": 1.0,   # Belo Horizonte: MODERADO
+    "3131703": 7.0,   # Ipatinga: EPIDEMIA (ver _SEMANA_MAX_2026 para limite de semanas)
+    "3163706": 0.5,   # Varginha: BAIXO
+    "3550308": 1.0,   # São Paulo: MODERADO
+    "3509502": 2.5,   # Campinas: ALTO
+}
+_SEMANA_MAX_2026 = {
+    "3131703": 10,    # Ipatinga: dados disponíveis apenas até semana 10 (EPIDEMIA em curso)
+}
+
+for _co_municipio, _mult in _MULT_2026.items():
+    _base = BASE_CASOS[_co_municipio]
+    _max_s = _SEMANA_MAX_2026.get(_co_municipio, _SEMANA_ATUAL_2026)
+    for _semana in range(1, _max_s + 1):
+        # Semanas 1-12 estão todas no período de pico (≤ 15)
+        _casos = int(_base * _mult * random.randint(2, 5))
+        CASOS_DENGUE.append(
+            {
+                "co_municipio": _co_municipio,
+                "ano": 2026,
+                "semana_epi": _semana,
+                "total_casos": _casos,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
