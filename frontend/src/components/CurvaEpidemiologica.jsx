@@ -73,16 +73,28 @@ export default function CurvaEpidemiologica({ perfil }) {
     },
   };
 
+  const temComparativo = perfil?.semanasAnoAnterior?.length > 0;
+
   return (
-    <div className="bg-white rounded-xl shadow p-6 mx-6 max-w-6xl md:mx-auto">
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-        📈 {perfil?.semanasAnoAnterior?.length
-          ? `Casos por semana — ${perfil.ano} vs ${perfil.ano - 1}`
-          : `Casos por semana — ${perfil.doenca} ${perfil.ano}`}
-        <span className="ml-2 text-xs text-gray-400 normal-case">
-          Pico: {pico} casos na semana {semPico}
-        </span>
-      </h2>
+    <div className="bg-white rounded-xl shadow-sm p-6 mx-6 max-w-6xl md:mx-auto">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700">
+            Casos por semana epidemiológica — {perfil.ano}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {temComparativo
+              ? `Linha sólida = ${perfil.ano} · Linha tracejada = ${perfil.ano - 1}`
+              : `Semanas 1 a 52 de ${perfil.ano}`}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-400">Pico registrado</p>
+          <p className="text-sm font-bold text-gray-700">
+            {pico} casos — Sem. {semPico}
+          </p>
+        </div>
+      </div>
       <Line data={data} options={options} />
     </div>
   );

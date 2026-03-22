@@ -52,6 +52,10 @@ function Resultado() {
 
   const perfil = dados.perfil || {};
 
+  const hoje = new Date();
+  const em14dias = new Date(hoje.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const formatarData = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
   const ANO_ATUAL = new Date().getFullYear();
   const mostrarRiscoFuturo = perfil?.ano === ANO_ATUAL || perfil?.ano === ANO_ATUAL - 1;
 
@@ -107,7 +111,7 @@ function Resultado() {
         {/* 5. RISCO FUTURO — 14 bolinhas */}
         {mostrarRiscoFuturo ? (
           <section>
-            <SectionTitle icone="🌡️" titulo="Risco climático — próximos 14 dias" />
+            <SectionTitle icone="🌡️" titulo={`Risco climático — ${formatarData(hoje)} a ${formatarData(em14dias)}`} />
             <RiscoFuturo risco={dados?.risco} />
           </section>
         ) : (

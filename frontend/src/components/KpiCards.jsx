@@ -1,8 +1,16 @@
 import { getCor } from "../utils/cores";
 
-function Card({ titulo, valor, sub, cor }) {
+const contextoIncidencia = (inc, classif) => {
+  if (!inc) return null;
+  if (classif === "EPIDEMIA") return "⚠️ Muito acima do normal";
+  if (classif === "ALTO")     return "↑ Acima da média";
+  if (classif === "MODERADO") return "→ Na média";
+  return "✓ Abaixo da média";
+};
+
+function Card({ titulo, valor, sub, cor, extraClasses = "", children }) {
   return (
-    <div className="bg-white rounded-xl shadow p-5 flex flex-col gap-1">
+    <div className={`bg-white rounded-xl shadow-sm p-5 flex flex-col gap-1 ${extraClasses}`}>
       <p className="text-xs text-gray-400 uppercase tracking-wider">{titulo}</p>
       <p className="text-3xl font-black text-gray-800">{valor}</p>
       {sub && <p className="text-xs text-gray-400">{sub}</p>}
@@ -11,6 +19,7 @@ function Card({ titulo, valor, sub, cor }) {
           {cor.label || ""}
         </span>
       )}
+      {children}
     </div>
   );
 }
@@ -26,18 +35,36 @@ export default function KpiCards({ perfil, risco }) {
         titulo="Total de casos"
         valor={perfil?.totalCasos?.toLocaleString("pt-BR") || "—"}
         sub={`em ${perfil?.ano}`}
-      />
+      >
+        {perfil?.semanasAnoAnterior?.length > 0 && (() => {
+          const totalAnterior = perfil.semanasAnoAnterior
+            .reduce((s, x) => s + x.casos, 0);
+          const variacao = totalAnterior > 0
+            ? ((perfil.totalCasos - totalAnterior) / totalAnterior * 100).toFixed(0)
+            : null;
+          return variacao ? (
+            <p className={`text-xs mt-1 ${Number(variacao) > 0 ? "text-red-500" : "text-green-600"}`}>
+              {Number(variacao) > 0 ? "↑ +" : "↓ "}{variacao}% vs {perfil.ano - 1}
+            </p>
+          ) : null;
+        })()}
+      </Card>
 
       <Card
         titulo="Incidência"
         valor={perfil?.incidencia100k?.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) || "—"}
         sub="por 100 mil habitantes"
-      />
+      >
+        <p className="text-xs text-gray-400 mt-1">
+          {contextoIncidencia(perfil?.incidencia100k, perfil?.classificacao)}
+        </p>
+      </Card>
 
       <Card
         titulo="Classificação"
         valor={perfil?.classificacao || "—"}
         cor={{ ...corClassif, label: perfil?.classificacao }}
+        extraClasses={`border-2 ${corClassif.borda || "border-gray-200"} ${corClassif.light || ""}`}
       />
 
       <Card
