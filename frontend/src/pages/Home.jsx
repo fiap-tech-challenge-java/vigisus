@@ -55,13 +55,30 @@ export default function Home() {
       .finally(() => setLoadingCards(false));
   }, [ufCards]);
 
-  // ── Executa busca e navega ────────────────────────────────
-  const executarBusca = async (pergunta) => {
+  // ── Executa busca, determina modo e navega ───────────────
+  const executarBusca = async (pergunta, overrideAno = null) => {
     setErro("");
     setLoading(true);
     try {
       const response = await buscarPorPergunta(pergunta);
-      navigate("/resultado", { state: { dados: response.data, pergunta } });
+      const dados = response.data;
+      const perfil = dados?.perfil || {};
+
+      const anoAtual = new Date().getFullYear();
+      const anoResult = overrideAno != null ? overrideAno : perfil.ano;
+      const isHistorico = anoResult && Number(anoResult) < anoAtual - 1;
+
+      const params = new URLSearchParams();
+      if (perfil.municipio) params.set("municipio", perfil.municipio);
+      if (perfil.uf)        params.set("uf", perfil.uf);
+      if (perfil.doenca)    params.set("doenca", perfil.doenca);
+
+      if (isHistorico) {
+        params.set("ano", anoResult);
+        navigate(`/historico?${params.toString()}`, { state: { dados } });
+      } else {
+        navigate(`/atual?${params.toString()}`, { state: { dados } });
+      }
     } catch {
       setErro("Erro ao buscar dados. Tente novamente.");
     } finally {
@@ -73,13 +90,13 @@ export default function Home() {
   const submitEstruturado = (e) => {
     e.preventDefault();
     if (!municipio.trim()) { setErro("Informe o município."); return; }
-    executarBusca(`${doenca} em ${municipio} ${uf} ${ano}`);
+    executarBusca(`${doenca} em ${municipio} ${uf} ${ano}`, ano);
   };
 
   // ── Clique no card de cidade crítica ─────────────────────
   const clicarCard = (card) => {
     const pergunta = `${doenca} em ${card.municipio} ${ufCards} ${ano}`;
-    executarBusca(pergunta);
+    executarBusca(pergunta, ano);
   };
 
   // ── Botões de exemplo rápido ─────────────────────────────
@@ -94,7 +111,7 @@ export default function Home() {
     setUf(ex.uf);
     setDoenca(ex.doenca);
     setAno(ex.ano);
-    executarBusca(`${ex.doenca} em ${ex.municipio} ${ex.uf} ${ex.ano}`);
+    executarBusca(`${ex.doenca} em ${ex.municipio} ${ex.uf} ${ex.ano}`, ex.ano);
   };
 
   // ── Conta municípios em epidemia ─────────────────────────
