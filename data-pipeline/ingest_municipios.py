@@ -46,6 +46,43 @@ COORDENADAS_CONHECIDAS = {
 }
 
 
+# Fallback: UF pelo prefixo do código IBGE (2 primeiros dígitos)
+# Referência: tabela oficial de códigos UF do IBGE.
+UF_POR_PREFIXO_IBGE = {
+    "11": "RO",
+    "12": "AC",
+    "13": "AM",
+    "14": "RR",
+    "15": "PA",
+    "16": "AP",
+    "17": "TO",
+    "21": "MA",
+    "22": "PI",
+    "23": "CE",
+    "24": "RN",
+    "25": "PB",
+    "26": "PE",
+    "27": "AL",
+    "28": "SE",
+    "29": "BA",
+    "31": "MG",
+    "32": "ES",
+    "33": "RJ",
+    "35": "SP",
+    "41": "PR",
+    "42": "SC",
+    "43": "RS",
+    "50": "MS",
+    "51": "MT",
+    "52": "GO",
+    "53": "DF",
+}
+
+
+def _fallback_sg_uf(co_ibge: str) -> str:
+    return UF_POR_PREFIXO_IBGE.get(co_ibge[:2], "XX")
+
+
 def fetch_municipios() -> list:
     """Busca todos os municípios do Brasil na API do IBGE."""
     url = f"{IBGE_BASE_URL}/v1/localidades/municipios"
@@ -72,7 +109,12 @@ def upsert_municipios(municipios: list) -> int:
 
     records = []
     for m in municipios:
-        co_ibge = str(m["id"])
+        raw_id = m.get("id") if isinstance(m, dict) else None
+        if raw_id is None:
+            logger.warning("Payload inesperado do IBGE (sem 'id'): %s", m)
+            continue
+
+        co_ibge = str(raw_id)
         lat, lon = COORDENADAS_CONHECIDAS.get(co_ibge, (None, None))
         
         # Safely extract UF sigla from nested structure
@@ -87,9 +129,14 @@ def upsert_municipios(municipios: list) -> int:
                         sg_uf = uf.get("sigla")
         except (KeyError, TypeError):
             logger.warning("Could not extract UF for município %s (%s)", m.get("nome"), co_ibge)
+
+        if not sg_uf:
+            sg_uf = _fallback_sg_uf(co_ibge)
         
         records.append(
             {
+                # A tabela espera o bind :id; usamos o próprio código IBGE.
+                "id": co_ibge,
                 "co_ibge": co_ibge,
                 "no_municipio": m["nome"],
                 "sg_uf": sg_uf,
@@ -97,6 +144,10 @@ def upsert_municipios(municipios: list) -> int:
                 "nu_longitude": lon,
             }
         )
+
+    if not records:
+        logger.warning("Nenhum município retornado para upsert.")
+        return 0
 
     with engine.begin() as conn:
         conn.execute(sql, records)

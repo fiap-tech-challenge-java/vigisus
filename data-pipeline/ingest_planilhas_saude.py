@@ -501,20 +501,18 @@ def _aggregate_dengue(
     ]
 
 
-def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
+def _replace_saude_basica(conn, estabelecimentos, leitos, servicos):
     before = {
         "estabelecimentos": conn.execute(text("SELECT COUNT(*) FROM estabelecimentos")).scalar_one(),
         "leitos": conn.execute(text("SELECT COUNT(*) FROM leitos")).scalar_one(),
         "servicos": conn.execute(text("SELECT COUNT(*) FROM servicos_especializados")).scalar_one(),
-        "casos": conn.execute(text("SELECT COUNT(*) FROM casos_dengue")).scalar_one(),
     }
 
     logger.info(
-        "Limpando dados anteriores: estabelecimentos=%d, leitos=%d, servicos=%d, casos=%d",
+        "Limpando dados anteriores (ST/LT/SR): estabelecimentos=%d, leitos=%d, servicos=%d",
         before["estabelecimentos"],
         before["leitos"],
         before["servicos"],
-        before["casos"],
     )
 
     # Full reload: remove todos os registros das tabelas de saude
@@ -525,12 +523,26 @@ def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
             TRUNCATE TABLE
                 leitos,
                 servicos_especializados,
-                estabelecimentos,
-                casos_dengue
+                estabelecimentos
             RESTART IDENTITY
             """
         )
     )
+
+    cnes_validos = {item["co_cnes"] for item in estabelecimentos}
+    leitos_filtrados = [item for item in leitos if item.get("co_cnes") in cnes_validos]
+    servicos_filtrados = [item for item in servicos if item.get("co_cnes") in cnes_validos]
+
+    if len(leitos_filtrados) != len(leitos):
+        logger.warning(
+            "Leitos descartados por CNES ausente em ST: %d",
+            len(leitos) - len(leitos_filtrados),
+        )
+    if len(servicos_filtrados) != len(servicos):
+        logger.warning(
+            "Servicos descartados por CNES ausente em ST: %d",
+            len(servicos) - len(servicos_filtrados),
+        )
 
     if estabelecimentos:
         conn.execute(
@@ -547,7 +559,7 @@ def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
             estabelecimentos,
         )
 
-    if leitos:
+    if leitos_filtrados:
         conn.execute(
             text(
                 """
@@ -557,10 +569,10 @@ def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
                     (:co_cnes, :tp_leito, :ds_leito, :qt_exist, :qt_sus, :competencia)
                 """
             ),
-            leitos,
+            leitos_filtrados,
         )
 
-    if servicos:
+    if servicos_filtrados:
         conn.execute(
             text(
                 """
@@ -570,8 +582,27 @@ def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
                     (:co_cnes, :serv_esp, :class_sr, :competencia)
                 """
             ),
-            servicos,
+            servicos_filtrados,
         )
+
+    after = {
+        "estabelecimentos": conn.execute(text("SELECT COUNT(*) FROM estabelecimentos")).scalar_one(),
+        "leitos": conn.execute(text("SELECT COUNT(*) FROM leitos")).scalar_one(),
+        "servicos": conn.execute(text("SELECT COUNT(*) FROM servicos_especializados")).scalar_one(),
+    }
+    logger.info(
+        "Carga ST/LT/SR aplicada: estabelecimentos=%d, leitos=%d, servicos=%d",
+        after["estabelecimentos"],
+        after["leitos"],
+        after["servicos"],
+    )
+
+
+def _replace_casos_dengue(conn, casos_dengue):
+    before = conn.execute(text("SELECT COUNT(*) FROM casos_dengue")).scalar_one()
+    logger.info("Limpando casos_dengue anteriores: %d", before)
+
+    conn.execute(text("TRUNCATE TABLE casos_dengue RESTART IDENTITY"))
 
     if casos_dengue:
         conn.execute(
@@ -586,19 +617,8 @@ def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
             casos_dengue,
         )
 
-    after = {
-        "estabelecimentos": conn.execute(text("SELECT COUNT(*) FROM estabelecimentos")).scalar_one(),
-        "leitos": conn.execute(text("SELECT COUNT(*) FROM leitos")).scalar_one(),
-        "servicos": conn.execute(text("SELECT COUNT(*) FROM servicos_especializados")).scalar_one(),
-        "casos": conn.execute(text("SELECT COUNT(*) FROM casos_dengue")).scalar_one(),
-    }
-    logger.info(
-        "Carga aplicada: estabelecimentos=%d, leitos=%d, servicos=%d, casos=%d",
-        after["estabelecimentos"],
-        after["leitos"],
-        after["servicos"],
-        after["casos"],
-    )
+    after = conn.execute(text("SELECT COUNT(*) FROM casos_dengue")).scalar_one()
+    logger.info("Carga de casos_dengue aplicada: %d", after)
 
 
 def run() -> None:
@@ -618,21 +638,26 @@ def run() -> None:
         )
 
     engine = create_engine(DB_URL)
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         resolver = _build_municipio_resolver(conn)
         all_codes, unique_prefix_map = _build_municipio_maps(conn)
 
-        estabelecimentos = _prepare_estabelecimentos(files.get("ST", []), resolver)
-        leitos = _prepare_leitos(files.get("LT", []), resolver)
-        servicos = _prepare_servicos(files.get("SR", []), resolver)
-        casos_dengue = _aggregate_dengue(
-            files.get("DENG", []),
-            resolver,
-            all_codes,
-            unique_prefix_map,
-        )
+    estabelecimentos = _prepare_estabelecimentos(files.get("ST", []), resolver)
+    leitos = _prepare_leitos(files.get("LT", []), resolver)
+    servicos = _prepare_servicos(files.get("SR", []), resolver)
 
-        _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue)
+    with engine.begin() as conn:
+        _replace_saude_basica(conn, estabelecimentos, leitos, servicos)
+
+    casos_dengue = _aggregate_dengue(
+        files.get("DENG", []),
+        resolver,
+        all_codes,
+        unique_prefix_map,
+    )
+
+    with engine.begin() as conn:
+        _replace_casos_dengue(conn, casos_dengue)
 
     logger.info(
         "Ingestão concluída: %d estabelecimentos, %d leitos, %d serviços, %d casos agregados",
