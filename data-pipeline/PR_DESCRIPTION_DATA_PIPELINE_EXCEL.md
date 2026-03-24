@@ -22,6 +22,7 @@ Substituir o fluxo mockado de dados de saúde por ingestao real a partir de plan
 - Mantido fallback automatico para `data-pipeline/data/csv/` quando `csv_input/` estiver vazia.
 - Adicionada dependencia `openpyxl` em `requirements.txt`.
 - README atualizado com instrucoes do novo fluxo.
+- Atualizado `.gitignore` raiz para ignorar ambientes virtuais locais (`.venv`, `.venv-wsl`, `.venv311`).
 
 ## Como validar
 1. Instalar dependencias:
@@ -44,8 +45,8 @@ Substituir o fluxo mockado de dados de saúde por ingestao real a partir de plan
 - `data-pipeline/requirements.txt`
 - `data-pipeline/README.md`
 - `data-pipeline/csv_input/.gitkeep`
+- `.gitignore`
 
 ## Observacoes
 - Alteracoes locais nao relacionadas e nao incluidas neste PR:
-  - `.gitignore`
   - `data-pipeline/ingest_municipios.py`
