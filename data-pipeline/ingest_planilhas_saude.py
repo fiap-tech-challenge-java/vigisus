@@ -59,15 +59,20 @@ def _normalize_col(col: str) -> str:
 
 def _read_columns(path: Path) -> list[str]:
     if path.suffix.lower() == ".csv":
-        with path.open("r", encoding="utf-8-sig", newline="") as fh:
-            sample = fh.read(4096)
-            fh.seek(0)
+        for encoding in ("utf-8-sig", "latin-1"):
             try:
-                dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
-                reader = csv.reader(fh, delimiter=dialect.delimiter)
-            except csv.Error:
-                reader = csv.reader(fh, delimiter=",")
-            return next(reader)
+                with path.open("r", encoding=encoding, newline="") as fh:
+                    sample = fh.read(4096)
+                    fh.seek(0)
+                    try:
+                        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+                        reader = csv.reader(fh, delimiter=dialect.delimiter)
+                    except csv.Error:
+                        reader = csv.reader(fh, delimiter=",")
+                    return next(reader)
+            except UnicodeDecodeError:
+                continue
+        raise UnicodeDecodeError("csv", b"", 0, 1, f"Nao foi possivel decodificar arquivo CSV: {path}")
 
     df = pd.read_excel(path, nrows=0)
     return [str(c) for c in df.columns]
@@ -90,7 +95,18 @@ def _build_column_lookup(path: Path) -> tuple[dict[str, str], list[str]]:
 
 def _read_dataframe(path: Path, use_columns: list[str]) -> pd.DataFrame:
     if path.suffix.lower() == ".csv":
-        return pd.read_csv(path, usecols=use_columns, dtype=str, low_memory=False)
+        for encoding in ("utf-8-sig", "latin-1"):
+            try:
+                return pd.read_csv(
+                    path,
+                    usecols=use_columns,
+                    dtype=str,
+                    low_memory=False,
+                    encoding=encoding,
+                )
+            except UnicodeDecodeError:
+                continue
+        raise UnicodeDecodeError("csv", b"", 0, 1, f"Nao foi possivel decodificar arquivo CSV: {path}")
     return pd.read_excel(path, usecols=use_columns, dtype=str)
 
 
@@ -203,6 +219,44 @@ def _build_municipio_resolver(conn):
         return None
 
     return resolve
+
+
+def _build_municipio_maps(conn) -> tuple[set[str], dict[str, str]]:
+    all_codes = {
+        row[0]
+        for row in conn.execute(text("SELECT co_ibge FROM municipios"))
+        if row and row[0]
+    }
+    prefix_index = defaultdict(list)
+    for code in all_codes:
+        prefix_index[code[:6]].append(code)
+
+    unique_prefix_map = {
+        prefix: codes[0]
+        for prefix, codes in prefix_index.items()
+        if len(codes) == 1
+    }
+    return all_codes, unique_prefix_map
+
+
+def _resolve_municipio_series(
+    raw_series: pd.Series,
+    all_codes: set[str],
+    unique_prefix_map: dict[str, str],
+) -> pd.Series:
+    digits = raw_series.fillna("").astype(str).str.replace(r"\D", "", regex=True)
+    resolved = pd.Series(index=digits.index, dtype="object")
+
+    mask7 = digits.str.len() == 7
+    if mask7.any():
+        s7 = digits.loc[mask7]
+        resolved.loc[mask7] = s7.where(s7.isin(all_codes))
+
+    mask6 = resolved.isna() & (digits.str.len() >= 6)
+    if mask6.any():
+        resolved.loc[mask6] = digits.loc[mask6].str[:6].map(unique_prefix_map)
+
+    return resolved
 
 
 def _prepare_estabelecimentos(paths: list[Path], resolver) -> list[dict]:
@@ -337,7 +391,12 @@ def _extract_ano_semana(row: dict) -> tuple[int | None, int | None]:
     return ano, semana
 
 
-def _aggregate_dengue(paths: list[Path], resolver) -> list[dict]:
+def _aggregate_dengue(
+    paths: list[Path],
+    resolver,
+    all_codes: set[str],
+    unique_prefix_map: dict[str, str],
+) -> list[dict]:
     grouped = defaultdict(int)
 
     for path in paths:
@@ -349,13 +408,22 @@ def _aggregate_dengue(paths: list[Path], resolver) -> list[dict]:
 
         use_cols = [mapped[k] for k in mapped]
         if path.suffix.lower() == ".csv":
-            iterator = pd.read_csv(
-                path,
-                usecols=use_cols,
-                dtype=str,
-                low_memory=False,
-                chunksize=200_000,
-            )
+            iterator = None
+            for encoding in ("utf-8-sig", "latin-1"):
+                try:
+                    iterator = pd.read_csv(
+                        path,
+                        usecols=use_cols,
+                        dtype=str,
+                        low_memory=False,
+                        chunksize=200_000,
+                        encoding=encoding,
+                    )
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if iterator is None:
+                raise UnicodeDecodeError("csv", b"", 0, 1, f"Nao foi possivel decodificar arquivo CSV: {path}")
         else:
             iterator = [pd.read_excel(path, usecols=use_cols, dtype=str)]
 
@@ -363,16 +431,62 @@ def _aggregate_dengue(paths: list[Path], resolver) -> list[dict]:
         for chunk in iterator:
             chunk = chunk.rename(columns={v: k for k, v in mapped.items()})
             total_rows += len(chunk)
-            for _, row in chunk.iterrows():
-                co_municipio = _map_codigo_municipio(row.get("co_municipio"), resolver)
-                if not co_municipio:
-                    continue
 
-                ano, semana = _extract_ano_semana(row)
-                if ano is None or semana is None or semana <= 0 or semana > 53:
-                    continue
+            # Processamento vetorizado para evitar iteracao linha a linha em arquivos grandes.
+            chunk["co_municipio"] = _resolve_municipio_series(
+                chunk["co_municipio"],
+                all_codes,
+                unique_prefix_map,
+            )
 
-                grouped[(co_municipio, ano, semana)] += 1
+            sem_raw = chunk["semana_epi"].astype(str).str.replace(r"\D", "", regex=True)
+            has_yyyynn = sem_raw.str.len() >= 6
+
+            semana = pd.to_numeric(
+                sem_raw.where(~has_yyyynn, sem_raw.str[-2:]),
+                errors="coerce",
+            )
+
+            if "ano" in chunk.columns:
+                ano = pd.to_numeric(chunk["ano"], errors="coerce")
+            else:
+                ano = pd.Series([None] * len(chunk), index=chunk.index, dtype="float64")
+
+            ano_from_sem = pd.to_numeric(sem_raw.str[:4], errors="coerce")
+            ano = ano.fillna(ano_from_sem)
+
+            if "dt_notific" in chunk.columns:
+                ano_from_dt = pd.to_numeric(
+                    chunk["dt_notific"].astype(str).str.replace(r"\D", "", regex=True).str[:4],
+                    errors="coerce",
+                )
+                ano = ano.fillna(ano_from_dt)
+
+            filtered = pd.DataFrame(
+                {
+                    "co_municipio": chunk["co_municipio"],
+                    "ano": ano,
+                    "semana_epi": semana,
+                }
+            )
+
+            filtered = filtered.dropna(subset=["co_municipio", "ano", "semana_epi"])
+            filtered = filtered[
+                (filtered["semana_epi"] > 0) & (filtered["semana_epi"] <= 53)
+            ]
+
+            if filtered.empty:
+                continue
+
+            filtered["ano"] = filtered["ano"].astype(int)
+            filtered["semana_epi"] = filtered["semana_epi"].astype(int)
+
+            agg = (
+                filtered.groupby(["co_municipio", "ano", "semana_epi"]).size().reset_index(name="total")
+            )
+
+            for _, row in agg.iterrows():
+                grouped[(row["co_municipio"], int(row["ano"]), int(row["semana_epi"]))] += int(row["total"])
 
         logger.info("DENG processado: %s (%d linhas, %d colunas)", path, total_rows, len(available))
 
@@ -388,11 +502,35 @@ def _aggregate_dengue(paths: list[Path], resolver) -> list[dict]:
 
 
 def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
-    # Ordem de deleção respeita as FKs existentes.
-    conn.execute(text("DELETE FROM leitos"))
-    conn.execute(text("DELETE FROM servicos_especializados"))
-    conn.execute(text("DELETE FROM estabelecimentos"))
-    conn.execute(text("DELETE FROM casos_dengue"))
+    before = {
+        "estabelecimentos": conn.execute(text("SELECT COUNT(*) FROM estabelecimentos")).scalar_one(),
+        "leitos": conn.execute(text("SELECT COUNT(*) FROM leitos")).scalar_one(),
+        "servicos": conn.execute(text("SELECT COUNT(*) FROM servicos_especializados")).scalar_one(),
+        "casos": conn.execute(text("SELECT COUNT(*) FROM casos_dengue")).scalar_one(),
+    }
+
+    logger.info(
+        "Limpando dados anteriores: estabelecimentos=%d, leitos=%d, servicos=%d, casos=%d",
+        before["estabelecimentos"],
+        before["leitos"],
+        before["servicos"],
+        before["casos"],
+    )
+
+    # Full reload: remove todos os registros das tabelas de saude
+    # (inclui dados de mock) e carrega os dados da planilha na mesma transacao.
+    conn.execute(
+        text(
+            """
+            TRUNCATE TABLE
+                leitos,
+                servicos_especializados,
+                estabelecimentos,
+                casos_dengue
+            RESTART IDENTITY
+            """
+        )
+    )
 
     if estabelecimentos:
         conn.execute(
@@ -448,6 +586,20 @@ def _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue):
             casos_dengue,
         )
 
+    after = {
+        "estabelecimentos": conn.execute(text("SELECT COUNT(*) FROM estabelecimentos")).scalar_one(),
+        "leitos": conn.execute(text("SELECT COUNT(*) FROM leitos")).scalar_one(),
+        "servicos": conn.execute(text("SELECT COUNT(*) FROM servicos_especializados")).scalar_one(),
+        "casos": conn.execute(text("SELECT COUNT(*) FROM casos_dengue")).scalar_one(),
+    }
+    logger.info(
+        "Carga aplicada: estabelecimentos=%d, leitos=%d, servicos=%d, casos=%d",
+        after["estabelecimentos"],
+        after["leitos"],
+        after["servicos"],
+        after["casos"],
+    )
+
 
 def run() -> None:
     files = _find_source_files()
@@ -459,14 +611,26 @@ def run() -> None:
         len(files.get("DENG", [])),
     )
 
+    if not any(files.get(k) for k in ("ST", "LT", "SR", "DENG")):
+        raise RuntimeError(
+            "Nenhum arquivo ST/LT/SR/DENG encontrado para carga. "
+            "Sem arquivos, a limpeza nao e executada para evitar esvaziar as tabelas por engano."
+        )
+
     engine = create_engine(DB_URL)
     with engine.begin() as conn:
         resolver = _build_municipio_resolver(conn)
+        all_codes, unique_prefix_map = _build_municipio_maps(conn)
 
         estabelecimentos = _prepare_estabelecimentos(files.get("ST", []), resolver)
         leitos = _prepare_leitos(files.get("LT", []), resolver)
         servicos = _prepare_servicos(files.get("SR", []), resolver)
-        casos_dengue = _aggregate_dengue(files.get("DENG", []), resolver)
+        casos_dengue = _aggregate_dengue(
+            files.get("DENG", []),
+            resolver,
+            all_codes,
+            unique_prefix_map,
+        )
 
         _replace_data(conn, estabelecimentos, leitos, servicos, casos_dengue)
 
