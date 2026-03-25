@@ -20,12 +20,10 @@ class IaServiceFallbackTest {
         fallback = new IaServiceFallback();
     }
 
-    // ── gerarTextoEpidemiologico ──────────────────────────────────────────────
-
     @Test
     void gerarTextoEpidemiologico_retornaTextoFormatado() {
         PerfilEpidemiologicoResponse perfil = PerfilEpidemiologicoResponse.builder()
-                .municipio("São Paulo")
+                .municipio("Sao Paulo")
                 .uf("SP")
                 .doenca("dengue")
                 .ano(2024)
@@ -37,14 +35,12 @@ class IaServiceFallbackTest {
         String texto = fallback.gerarTextoEpidemiologico(perfil);
 
         assertThat(texto).contains("2024");
-        assertThat(texto).contains("São Paulo");
+        assertThat(texto).contains("Sao Paulo");
         assertThat(texto).contains("SP");
         assertThat(texto).contains("1500");
         assertThat(texto).contains("dengue");
-        assertThat(texto).contains("ALTO");
+        assertThat(texto).contains("classificacao alto");
     }
-
-    // ── gerarTextoRisco ───────────────────────────────────────────────────────
 
     @Test
     void gerarTextoRisco_retornaTextoComFatores() {
@@ -52,19 +48,19 @@ class IaServiceFallbackTest {
                 .municipio("Campinas")
                 .score(6)
                 .classificacao("MUITO_ALTO")
-                .fatores(List.of("Temperatura ≥ 28°C", "Chuva ≥ 100mm"))
+                .fatores(List.of("Temperatura >= 28C", "Chuva >= 100mm"))
                 .build();
 
         String texto = fallback.gerarTextoRisco(previsao);
 
         assertThat(texto).contains("Campinas");
-        assertThat(texto).contains("MUITO_ALTO");
-        assertThat(texto).contains("Temperatura ≥ 28°C");
-        assertThat(texto).contains("Chuva ≥ 100mm");
+        assertThat(texto).contains("risco muito_alto");
+        assertThat(texto).contains("Temperatura >= 28C");
+        assertThat(texto).contains("Chuva >= 100mm");
     }
 
     @Test
-    void gerarTextoRisco_comFatoresVazios_usaNA() {
+    void gerarTextoRisco_comFatoresVazios_usaTextoPadrao() {
         PrevisaoRiscoResponse previsao = PrevisaoRiscoResponse.builder()
                 .municipio("Curitiba")
                 .score(0)
@@ -74,10 +70,8 @@ class IaServiceFallbackTest {
 
         String texto = fallback.gerarTextoRisco(previsao);
 
-        assertThat(texto).contains("N/A");
+        assertThat(texto).contains("fatores climaticos nao detalhados");
     }
-
-    // ── interpretarPergunta ───────────────────────────────────────────────────
 
     @Test
     void interpretarPergunta_extraiAno() {

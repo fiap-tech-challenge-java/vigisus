@@ -61,45 +61,22 @@ class PressaoOperacionalServiceTest {
     @BeforeEach
     void setUp() {
         service = new PressaoOperacionalService(
-                municipioService, casoDengueRepository,
-                previsaoRiscoService, encaminhamentoService, iaService);
+                municipioService, casoDengueRepository, previsaoRiscoService, encaminhamentoService, iaService);
 
         lenient().when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(MUNICIPIO);
-        lenient().when(casoDengueRepository.findCasosPorSemanas(anyString(), anyInt(), any()))
-                .thenReturn(List.of());
-        lenient().when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt()))
-                .thenReturn(0L);
-        lenient().when(iaService.gerarTextoOperacional(anyString()))
-                .thenReturn("Briefing de teste.");
+        lenient().when(casoDengueRepository.findCasosPorSemanas(anyString(), anyInt(), any())).thenReturn(List.of());
+        lenient().when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
+        lenient().when(iaService.gerarTextoOperacional(anyString())).thenReturn("Briefing de teste.");
         lenient().when(encaminhamentoService.buscarHospitais(anyString(), anyString(), anyInt()))
-                .thenReturn(EncaminhamentoResponse.builder()
-                        .coIbge(CO_IBGE)
-                        .municipioOrigem("Lavras")
-                        .tpLeito("74")
-                        .hospitais(List.of())
-                        .build());
+                .thenReturn(EncaminhamentoResponse.builder().coIbge(CO_IBGE).municipioOrigem("Lavras").tpLeito("74").hospitais(List.of()).build());
     }
-
-    // ── testUPAComMuitasSuspeitasEmEpidemiaDeveSerCritica ─────────────────────
 
     @Test
     void testUPAComMuitasSuspeitasEmEpidemiaDeveSerCritica() {
-        // suspeitasDia: 12 → +3
-        // classificação: EPIDEMIA → +3
-        // tendência: CRESCENTE → +2
-        // risco climático: MUITO_ALTO → +2
-        // total score = 10 → CRITICA
-
-        // Mock: EPIDEMIA (>300/100k: 307 cases / 102k pop)
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear()))
-                .thenReturn(307L);
-
-        // Mock: tendência CRESCENTE — semana atual (200) >> semana 3 atrás (100) × 1.2
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(307L);
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
         when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), anyInt(), any()))
                 .thenReturn(buildSemanas(currentWeek, 100L, 110L, 150L, 200L));
-
-        // Mock: risco MUITO_ALTO
         when(previsaoRiscoService.calcularRisco(CO_IBGE)).thenReturn(
                 PrevisaoRiscoResponse.builder()
                         .coIbge(CO_IBGE)
@@ -109,78 +86,35 @@ class PressaoOperacionalServiceTest {
                         .fatores(List.of("Temperatura alta", "Chuva intensa"))
                         .build());
 
-        PressaoOperacionalRequest req = new PressaoOperacionalRequest(CO_IBGE, 12, "UPA");
-        PressaoOperacionalResponse resp = service.avaliarPressao(req);
+        PressaoOperacionalResponse resp = service.avaliarPressao(new PressaoOperacionalRequest(CO_IBGE, 12, "UPA"));
 
         assertThat(resp.getNivelAtencao()).isEqualTo("CRITICO");
         assertThat(resp.getChecklistInformativo()).isNotEmpty();
         assertThat(resp.getContextoAtual()).isNotBlank();
     }
 
-    // ── testUBSComPoucasSuspeitasContextoBaixoDeveSerNormal ───────────────────
-
     @Test
     void testUBSComPoucasSuspeitasContextoBaixoDeveSerNormal() {
-        // suspeitasDia: 1 → +0
-        // classificação: BAIXO (0 casos) → +0
-        // tendência: ESTAVEL → +0
-        // risco climático: BAIXO (score 0) → +0
-        // total score = 0 → NORMAL
-
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt()))
-                .thenReturn(0L);
-
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
         when(previsaoRiscoService.calcularRisco(CO_IBGE)).thenReturn(
-                PrevisaoRiscoResponse.builder()
-                        .coIbge(CO_IBGE)
-                        .municipio("Lavras")
-                        .score(0)
-                        .classificacao("BAIXO")
-                        .fatores(List.of())
-                        .build());
+                PrevisaoRiscoResponse.builder().coIbge(CO_IBGE).municipio("Lavras").score(0).classificacao("BAIXO").fatores(List.of()).build());
 
-        PressaoOperacionalRequest req = new PressaoOperacionalRequest(CO_IBGE, 1, "UBS");
-        PressaoOperacionalResponse resp = service.avaliarPressao(req);
+        PressaoOperacionalResponse resp = service.avaliarPressao(new PressaoOperacionalRequest(CO_IBGE, 1, "UBS"));
 
         assertThat(resp.getNivelAtencao()).isEqualTo("NORMAL");
         assertThat(resp.getChecklistInformativo()).isNotEmpty();
     }
 
-    // ── testHospitaisReferenciaSaoRetornadosOrdenadosPorDistancia ─────────────
-
     @Test
     void testHospitaisReferenciaSaoRetornadosOrdenadosPorDistancia() {
-        // Hospital próximo (5 km) via clinicos query
-        HospitalDTO hospProximo = HospitalDTO.builder()
-                .coCnes("CNES001")
-                .noFantasia("Hospital Lavras")
-                .distanciaKm(5.0)
-                .build();
-        // Hospital distante (60 km) via UTI query
-        HospitalDTO hospDistante = HospitalDTO.builder()
-                .coCnes("CNES002")
-                .noFantasia("Hospital Varginha")
-                .distanciaKm(60.0)
-                .build();
-        // Hospital médio (30 km) also via clinicos query
-        HospitalDTO hospMedio = HospitalDTO.builder()
-                .coCnes("CNES003")
-                .noFantasia("Hospital Médio")
-                .distanciaKm(30.0)
-                .build();
+        HospitalDTO hospProximo = HospitalDTO.builder().coCnes("CNES001").noFantasia("Hospital Lavras").distanciaKm(5.0).build();
+        HospitalDTO hospDistante = HospitalDTO.builder().coCnes("CNES002").noFantasia("Hospital Varginha").distanciaKm(60.0).build();
+        HospitalDTO hospMedio = HospitalDTO.builder().coCnes("CNES003").noFantasia("Hospital Medio").distanciaKm(30.0).build();
 
-        // clinicos returns closest and medium
         when(encaminhamentoService.buscarHospitais(CO_IBGE, "74", 10))
-                .thenReturn(EncaminhamentoResponse.builder()
-                        .coIbge(CO_IBGE)
-                        .hospitais(List.of(hospProximo, hospMedio))
-                        .build());
-        // UTI returns distant
+                .thenReturn(EncaminhamentoResponse.builder().coIbge(CO_IBGE).hospitais(List.of(hospProximo, hospMedio)).build());
         when(encaminhamentoService.buscarHospitais(CO_IBGE, "81", 5))
-                .thenReturn(EncaminhamentoResponse.builder()
-                        .coIbge(CO_IBGE)
-                        .hospitais(List.of(hospDistante))
-                        .build());
+                .thenReturn(EncaminhamentoResponse.builder().coIbge(CO_IBGE).hospitais(List.of(hospDistante)).build());
 
         List<HospitalDTO> result = service.buscarHospitaisReferencia(CO_IBGE);
 
@@ -190,42 +124,119 @@ class PressaoOperacionalServiceTest {
         assertThat(result.get(0).getNoFantasia()).isEqualTo("Hospital Lavras");
     }
 
-    // ── testNivelAtencaoCalculation (unit tests for scoring) ──────────────────
+    @Test
+    void buscarHospitaisReferencia_removeDuplicadosELimitaATres() {
+        HospitalDTO h1 = HospitalDTO.builder().coCnes("1").noFantasia("H1").distanciaKm(15.0).build();
+        HospitalDTO h2 = HospitalDTO.builder().coCnes("2").noFantasia("H2").distanciaKm(5.0).build();
+        HospitalDTO h3 = HospitalDTO.builder().coCnes("3").noFantasia("H3").distanciaKm(25.0).build();
+        HospitalDTO h4 = HospitalDTO.builder().coCnes("4").noFantasia("H4").distanciaKm(35.0).build();
+        when(encaminhamentoService.buscarHospitais(CO_IBGE, "74", 10))
+                .thenReturn(EncaminhamentoResponse.builder().coIbge(CO_IBGE).hospitais(List.of(h1, h2)).build());
+        when(encaminhamentoService.buscarHospitais(CO_IBGE, "81", 5))
+                .thenReturn(EncaminhamentoResponse.builder().coIbge(CO_IBGE).hospitais(List.of(h2, h3, h4)).build());
+
+        List<HospitalDTO> result = service.buscarHospitaisReferencia(CO_IBGE);
+
+        assertThat(result).extracting(HospitalDTO::getCoCnes).containsExactly("2", "1", "3");
+    }
+
+    @Test
+    void construirContexto_quandoAnoAnteriorSemDados_retornaComparativoInsuficienteECrescente() {
+        int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
+        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
+                .thenReturn(buildSemanas(currentWeek, 0L, 0L, 0L, 5L));
+        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
+                .thenReturn(List.of());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(0L);
+
+        PressaoOperacionalResponse.ContextoEpidemiologicoDTO contexto = service.construirContexto(CO_IBGE);
+
+        assertThat(contexto.getClassificacaoAtual()).isEqualTo("BAIXO");
+        assertThat(contexto.getTendencia()).isEqualTo("CRESCENTE");
+        assertThat(contexto.getCasosUltimasSemanas()).isEqualTo(5);
+        assertThat(contexto.getComparativoHistorico()).contains("registros");
+    }
+
+    @Test
+    void construirContexto_quandoMesmoVolume_retornaComparativoSemelhanteEEstavel() {
+        int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
+        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
+                .thenReturn(buildSemanas(currentWeek, 10L, 10L, 10L, 10L));
+        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
+                .thenReturn(buildSemanas(currentWeek, 10L, 10L, 10L, 10L));
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(0L);
+
+        PressaoOperacionalResponse.ContextoEpidemiologicoDTO contexto = service.construirContexto(CO_IBGE);
+
+        assertThat(contexto.getTendencia()).isEqualTo("ESTAVEL");
+        assertThat(contexto.getComparativoHistorico()).contains("semelhante");
+    }
+
+    @Test
+    void avaliarPressao_quandoRiscoIndisponivel_usaFallbackNaPrevisaoEPadraoHistorico() {
+        int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
+        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
+                .thenReturn(buildSemanas(currentWeek, 1L, 1L, 1L, 1L));
+        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
+                .thenReturn(List.of());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(40L);
+        when(previsaoRiscoService.calcularRisco(CO_IBGE)).thenThrow(new RuntimeException("sem clima"));
+
+        PressaoOperacionalResponse resp = service.avaliarPressao(new PressaoOperacionalRequest(CO_IBGE, 3, "UBS"));
+
+        assertThat(resp.getPrevisao().getRiscoClimatico()).contains("Indispon");
+        assertThat(resp.getPrevisao().getTendencia7Dias()).contains("dispon");
+        assertThat(resp.getPadraoHistorico()).contains("insuficientes");
+        assertThat(resp.getNivelAtencao()).isEqualTo("NORMAL");
+    }
+
+    @Test
+    void avaliarPressao_quandoMunicipioFalhaNaClassificacao_retornaBaixoNoContexto() {
+        String outroIbge = "9999999";
+        Municipio outro = Municipio.builder().coIbge(outroIbge).noMunicipio("Cidade X").sgUf("MG").build();
+        int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
+        when(municipioService.buscarPorCoIbge(outroIbge)).thenReturn(outro).thenThrow(new RuntimeException("sem populacao"));
+        when(casoDengueRepository.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear()), any()))
+                .thenReturn(buildSemanas(currentWeek, 2L, 2L, 2L, 2L));
+        when(casoDengueRepository.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear() - 1), any()))
+                .thenReturn(List.of());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(outroIbge, LocalDate.now().getYear())).thenReturn(80L);
+        when(previsaoRiscoService.calcularRisco(outroIbge)).thenReturn(
+                PrevisaoRiscoResponse.builder().coIbge(outroIbge).municipio("Cidade X").score(0).classificacao("BAIXO").fatores(List.of()).build());
+
+        PressaoOperacionalResponse resp = service.avaliarPressao(new PressaoOperacionalRequest(outroIbge, 0, "UBS"));
+
+        assertThat(resp.getContexto().getClassificacaoAtual()).isEqualTo("BAIXO");
+    }
 
     @Test
     void testScoreApenasComSuspeitasAltas_deveSerNormal() {
-        // suspeitasDia: 7 → +2; classificação BAIXO → +0; tendência ESTAVEL → +0; sem risco → +0
-        // score = 2 → NORMAL (score <= 2)
-        PrevisaoRiscoResponse riscoNulo = PrevisaoRiscoResponse.builder()
-                .score(0).classificacao("BAIXO").fatores(List.of()).build();
-        String nivel = service.calcularNivelAtencao(7, "BAIXO", "ESTAVEL", riscoNulo);
+        PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder().score(0).classificacao("BAIXO").fatores(List.of()).build();
+        String nivel = service.calcularNivelAtencao(7, "BAIXO", "ESTAVEL", risco);
         assertThat(nivel).isEqualTo("NORMAL");
     }
 
     @Test
     void testScoreComSuspeitasEEpidemia_deveSerElevado() {
-        // suspeitasDia: 5 → +2; EPIDEMIA → +3; score = 5 → ELEVADO (3-5)
-        PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder()
-                .score(0).classificacao("BAIXO").fatores(List.of()).build();
+        PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder().score(0).classificacao("BAIXO").fatores(List.of()).build();
         String nivel = service.calcularNivelAtencao(5, "EPIDEMIA", "ESTAVEL", risco);
         assertThat(nivel).isEqualTo("ELEVADO");
     }
 
     @Test
     void testScoreCriticoComTodosOsFatores() {
-        // suspeitasDia: 10 → +3; EPIDEMIA → +3; CRESCENTE → +2; MUITO_ALTO → +2; score=10 → CRITICO
-        PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder()
-                .score(7).classificacao("MUITO_ALTO").fatores(List.of()).build();
+        PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder().score(7).classificacao("MUITO_ALTO").fatores(List.of()).build();
         String nivel = service.calcularNivelAtencao(10, "EPIDEMIA", "CRESCENTE", risco);
         assertThat(nivel).isEqualTo("CRITICO");
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
+    @Test
+    void calcularNivelAtencao_comRiscoAltoEAlertaModerado_retornaElevado() {
+        PrevisaoRiscoResponse risco = PrevisaoRiscoResponse.builder().score(5).classificacao("ALTO").fatores(List.of()).build();
+        String nivel = service.calcularNivelAtencao(2, "MODERADO", "ESTAVEL", risco);
+        assertThat(nivel).isEqualTo("ELEVADO");
+    }
 
-    /**
-     * Builds mock result rows for findCasosPorSemanas returning 4 weeks.
-     * weeks[0] = 3 weeks ago ... weeks[3] = current week
-     */
     private List<Object[]> buildSemanas(int currentWeek, long w3, long w2, long w1, long w0) {
         List<Object[]> rows = new ArrayList<>();
         rows.add(new Object[]{currentWeek - 3, w3});

@@ -84,9 +84,10 @@ public class RiscoAgregadoService {
     @Cacheable(value = "risco-estado", key = "#uf")
     public PrevisaoRiscoResponse calcularRiscoEstado(String uf) {
         log.info("[RiscoEstado] Calculando risco agregado para {}", uf);
+        String ufUpper = uf.toUpperCase();
 
         // 1. Buscar municípios do estado
-        List<Municipio> municipiosEstado = municipioRepository.findBySgUf(uf.toUpperCase());
+        List<Municipio> municipiosEstado = municipioRepository.findBySgUf(ufUpper);
         if (municipiosEstado.isEmpty()) {
             log.warn("[RiscoEstado] Nenhum município encontrado para {}", uf);
             return null;
@@ -109,13 +110,13 @@ public class RiscoAgregadoService {
         List<RiscoDiarioDTO> risco14Dias = calcularRisco14Dias(previsao16Dias);
 
         // 6. Calcular incidência histórica agregada (CACHE)
-        double incidenciaHistorica = calcularIncidenciaMediaEstado(uf, 2024);
+        double incidenciaHistorica = calcularIncidenciaMediaEstado(ufUpper, 2024);
 
         log.info("[RiscoEstado] {} - Score={}, Classificação={}, Incidência={}", uf, score, classificacao, incidenciaHistorica);
 
         return PrevisaoRiscoResponse.builder()
-                .coIbge(uf)
-                .municipio(obterNomeEstado(uf))
+                .coIbge(ufUpper)
+                .municipio(obterNomeEstado(ufUpper))
                 .score(score)
                 .classificacao(classificacao)
                 .incidencia(incidenciaHistorica)

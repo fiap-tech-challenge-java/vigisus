@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,5 +50,48 @@ class MunicipioServiceTest {
         assertThatThrownBy(() -> service.buscarPorCoIbge("9999999"))
                 .isInstanceOf(MunicipioNotFoundException.class)
                 .hasMessage("Município não encontrado: 9999999");
+    }
+    @Test
+    void listarPorUf_retornaMunicipiosDoEstado() {
+        Municipio municipio = Municipio.builder()
+                .coIbge("3131307")
+                .noMunicipio("Lavras")
+                .sgUf("MG")
+                .build();
+        when(municipioRepository.findBySgUf("MG")).thenReturn(List.of(municipio));
+
+        List<Municipio> result = service.listarPorUf("MG");
+
+        assertThat(result).containsExactly(municipio);
+    }
+
+    @Test
+    void buscarPorNomeEUf_retornaCandidatosFiltrados() {
+        Municipio municipio = Municipio.builder()
+                .coIbge("3131307")
+                .noMunicipio("Lavras")
+                .sgUf("MG")
+                .build();
+        when(municipioRepository.findByNoMunicipioContainingIgnoreCaseAndSgUf("Lav", "MG"))
+                .thenReturn(List.of(municipio));
+
+        List<Municipio> result = service.buscarPorNomeEUf("Lav", "MG");
+
+        assertThat(result).containsExactly(municipio);
+    }
+
+    @Test
+    void buscarPorNome_retornaPrimeiroResultado() {
+        Municipio municipio = Municipio.builder()
+                .coIbge("3131307")
+                .noMunicipio("Lavras")
+                .sgUf("MG")
+                .build();
+        when(municipioRepository.findTop1ByNoMunicipioContainingIgnoreCase("Lavras"))
+                .thenReturn(Optional.of(municipio));
+
+        Optional<Municipio> result = service.buscarPorNome("Lavras");
+
+        assertThat(result).contains(municipio);
     }
 }

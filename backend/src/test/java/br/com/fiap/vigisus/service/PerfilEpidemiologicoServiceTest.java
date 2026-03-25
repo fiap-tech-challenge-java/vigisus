@@ -2,6 +2,8 @@ package br.com.fiap.vigisus.service;
 
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.exception.DadosInsuficientesException;
+import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
+import br.com.fiap.vigisus.model.CasoDengue;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,20 +52,11 @@ class PerfilEpidemiologicoServiceTest {
                 .thenReturn(List.of());
     }
 
-    // ── testCalculaIncidenciaCorretamente ─────────────────────────────────────
-
     @Test
     void testCalculaIncidenciaCorretamente() {
-        // 306 cases / 102 000 pop * 100 000 = 300 per 100k → ALTO
-        Municipio municipio = Municipio.builder()
-                .coIbge(CO_IBGE)
-                .noMunicipio("Lavras")
-                .sgUf("MG")
-                .populacao(POPULACAO)
-                .build();
+        Municipio municipio = municipioBase();
         when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipio);
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024))
-                .thenReturn(306L);
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(306L);
 
         PerfilEpidemiologicoResponse response = service.gerarPerfil(CO_IBGE, "dengue", 2024);
 
@@ -72,20 +65,10 @@ class PerfilEpidemiologicoServiceTest {
         assertThat(response.getTotal()).isEqualTo(306L);
     }
 
-    // ── testClassificaEpidemiaAcimaDe300por100k ───────────────────────────────
-
     @Test
     void testClassificaEpidemiaAcimaDe300por100k() {
-        // 307 cases / 102 000 pop * 100 000 ≈ 300.98 per 100k → EPIDEMIA (> 300)
-        Municipio municipio = Municipio.builder()
-                .coIbge(CO_IBGE)
-                .noMunicipio("Lavras")
-                .sgUf("MG")
-                .populacao(POPULACAO)
-                .build();
-        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipio);
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024))
-                .thenReturn(307L);
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipioBase());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(307L);
 
         PerfilEpidemiologicoResponse response = service.gerarPerfil(CO_IBGE, "dengue", 2024);
 
@@ -93,37 +76,131 @@ class PerfilEpidemiologicoServiceTest {
         assertThat(response.getClassificacao()).isEqualTo("EPIDEMIA");
     }
 
-    // ── testLancaDadosInsuficientesQuandoSemCasos ─────────────────────────────
-
     @Test
     void testLancaDadosInsuficientesQuandoSemCasos() {
-        Municipio municipio = Municipio.builder()
-                .coIbge(CO_IBGE)
-                .noMunicipio("Lavras")
-                .sgUf("MG")
-                .populacao(POPULACAO)
-                .build();
-        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipio);
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024))
-                .thenReturn(0L);
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipioBase());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(0L);
 
         assertThatThrownBy(() -> service.gerarPerfil(CO_IBGE, "dengue", 2024))
                 .isInstanceOf(DadosInsuficientesException.class)
                 .hasMessage("Dados insuficientes para Lavras no ano 2024");
     }
 
-    // ── classificar thresholds (boundary tests) ────────────────────────────────
+    @Test
+    void gerarPerfil_lancaQuandoPopulacaoNaoDisponivel() {
+        Municipio municipio = Municipio.builder()
+                .coIbge(CO_IBGE)
+                .noMunicipio("Lavras")
+                .sgUf("MG")
+                .populacao(0L)
+                .nuLatitude(-21.245)
+                .nuLongitude(-44.999)
+                .build();
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipio);
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(10L);
+
+        assertThatThrownBy(() -> service.gerarPerfil(CO_IBGE, "dengue", 2024))
+                .isInstanceOf(RecursoNaoEncontradoException.class)
+                .hasMessageContaining("Popula");
+    }
+
+    @Test
+    void gerarPerfil_montaCamposDerivadosSemanasTendenciaEComparativos() {
+        Municipio lavras = municipioBase();
+        Municipio alfenas = Municipio.builder().coIbge("3101607").noMunicipio("Alfenas").sgUf("MG").populacao(80_000L).build();
+        Municipio varginha = Municipio.builder().coIbge("3170701").noMunicipio("Varginha").sgUf("MG").populacao(120_000L).build();
+
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(lavras);
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(204L);
+        when(rankingService.calcularPosicaoNoEstado(CO_IBGE, "MG", "dengue", 2024)).thenReturn("3 de 50");
+        when(casoDengueRepository.findByCoMunicipioAndAnoOrderBySemanaEpiAsc(CO_IBGE, 2024)).thenReturn(List.of(
+                caso(2024, 1, 5L),
+                caso(2024, 2, 5L),
+                caso(2024, 3, 5L),
+                caso(2024, 4, 5L),
+                caso(2024, 5, 10L),
+                caso(2024, 6, 10L),
+                caso(2024, 7, 10L),
+                caso(2024, 8, 20L)
+        ));
+        when(casoDengueRepository.findByCoMunicipioAndAnoOrderBySemanaEpiAsc(CO_IBGE, 2023)).thenReturn(List.of(
+                caso(2023, 1, null),
+                caso(2023, 2, 7L)
+        ));
+        when(municipioService.listarPorUf("MG")).thenReturn(List.of(lavras, alfenas, varginha));
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno("3101607", 2024)).thenReturn(80L);
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno("3170701", 2024)).thenReturn(0L);
+
+        PerfilEpidemiologicoResponse response = service.gerarPerfil(CO_IBGE, "dengue", 2024);
+
+        assertThat(response.getComparativoEstado()).isNotNull();
+        assertThat(response.getComparativoEstado().getPosicaoRankingEstado()).isEqualTo("3 de 50");
+        assertThat(response.getTendencia()).isEqualTo("CRESCENTE");
+        assertThat(response.getSemanas()).hasSize(8);
+        assertThat(response.getSemanasAnoAnterior()).hasSize(2);
+        assertThat(response.getSemanasAnoAnterior().get(0).getCasos()).isZero();
+        assertThat(response.getIncidenciaMediaEstado()).isCloseTo(150.0, within(0.01));
+        assertThat(response.getPosicaoEstado()).isEqualTo("3 de 50 municípios em MG");
+        assertThat(response.getUf()).isEqualTo("MG");
+        assertThat(response.getNuLatitude()).isEqualTo(-21.245);
+        assertThat(response.getNuLongitude()).isEqualTo(-44.999);
+    }
+
+    @Test
+    void gerarPerfil_quandoSemRankingEMediaEstadual_retornaNulosEEstavel() {
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipioBase());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(100L);
+        when(rankingService.calcularPosicaoNoEstado(CO_IBGE, "MG", "dengue", 2024)).thenReturn(null);
+        when(casoDengueRepository.findByCoMunicipioAndAnoOrderBySemanaEpiAsc(CO_IBGE, 2024)).thenReturn(List.of(
+                caso(2024, 1, 2L),
+                caso(2024, 2, 0L),
+                caso(2024, 3, 1L),
+                caso(2024, 4, 0L)
+        ));
+        when(casoDengueRepository.findByCoMunicipioAndAnoOrderBySemanaEpiAsc(CO_IBGE, 2023)).thenReturn(List.of());
+        when(municipioService.listarPorUf("MG")).thenReturn(List.of(
+                municipioBase(),
+                Municipio.builder().coIbge("1").noMunicipio("Sem Pop").sgUf("MG").populacao(0L).build()
+        ));
+
+        PerfilEpidemiologicoResponse response = service.gerarPerfil(CO_IBGE, "dengue", 2024);
+
+        assertThat(response.getComparativoEstado()).isNull();
+        assertThat(response.getPosicaoEstado()).isNull();
+        assertThat(response.getTendencia()).isEqualTo("ESTAVEL");
+        assertThat(response.getIncidenciaMediaEstado()).isCloseTo(98.039, within(0.01));
+    }
+
+    @Test
+    void gerarPerfil_detectaTendenciaDecrescente() {
+        when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(municipioBase());
+        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, 2024)).thenReturn(120L);
+        when(casoDengueRepository.findByCoMunicipioAndAnoOrderBySemanaEpiAsc(CO_IBGE, 2024)).thenReturn(List.of(
+                caso(2024, 1, 20L),
+                caso(2024, 2, 20L),
+                caso(2024, 3, 20L),
+                caso(2024, 4, 20L),
+                caso(2024, 5, 5L),
+                caso(2024, 6, 5L),
+                caso(2024, 7, 5L),
+                caso(2024, 8, 5L)
+        ));
+
+        PerfilEpidemiologicoResponse response = service.gerarPerfil(CO_IBGE, "dengue", 2024);
+
+        assertThat(response.getTendencia()).isEqualTo("DECRESCENTE");
+    }
 
     @ParameterizedTest
     @CsvSource({
-            "0.0,    BAIXO",
-            "49.99,  BAIXO",
-            "50.0,   MODERADO",
-            "99.99,  MODERADO",
-            "100.0,  ALTO",
-            "300.0,  ALTO",
-            "300.01, EPIDEMIA",
-            "500.0,  EPIDEMIA"
+            "0.0,BAIXO",
+            "49.99,BAIXO",
+            "50.0,MODERADO",
+            "99.99,MODERADO",
+            "100.0,ALTO",
+            "300.0,ALTO",
+            "300.01,EPIDEMIA",
+            "500.0,EPIDEMIA"
     })
     void classificar_thresholds(double incidencia, String expected) {
         String result = classificar(incidencia);
@@ -135,5 +212,25 @@ class PerfilEpidemiologicoServiceTest {
         if (incidencia < 100) return "MODERADO";
         if (incidencia <= 300) return "ALTO";
         return "EPIDEMIA";
+    }
+
+    private Municipio municipioBase() {
+        return Municipio.builder()
+                .coIbge(CO_IBGE)
+                .noMunicipio("Lavras")
+                .sgUf("MG")
+                .populacao(POPULACAO)
+                .nuLatitude(-21.245)
+                .nuLongitude(-44.999)
+                .build();
+    }
+
+    private CasoDengue caso(int ano, int semana, Long totalCasos) {
+        return CasoDengue.builder()
+                .coMunicipio(CO_IBGE)
+                .ano(ano)
+                .semanaEpi(semana)
+                .totalCasos(totalCasos)
+                .build();
     }
 }
