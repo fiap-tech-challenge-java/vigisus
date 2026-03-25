@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AccessibilityProvider } from "./accessibility/AccessibilityProvider";
 
 const Atual = lazy(() => import("./pages/Atual"));
 const Historico = lazy(() => import("./pages/Historico"));
@@ -14,15 +15,20 @@ function RouteFallback() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/atual" replace />} />
-          <Route path="/atual" element={<Atual />} />
-          <Route path="/historico" element={<Historico />} />
-          <Route path="*" element={<Navigate to="/atual" replace />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+    <AccessibilityProvider>
+      <a href="#main-content" className="vigi-skip-link">
+        Pular para o conteudo principal
+      </a>
+      <BrowserRouter>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/atual" replace />} />
+            <Route path="/atual" element={<Atual />} />
+            <Route path="/historico" element={<Historico />} />
+            <Route path="*" element={<Navigate to="/atual" replace />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </AccessibilityProvider>
   );
 }

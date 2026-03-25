@@ -64,9 +64,23 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
   );
 
   return (
-    <div className="mx-6 max-w-6xl md:mx-auto mt-4">
+    <div className="mx-6 max-w-6xl md:mx-auto mt-4 space-y-4">
+      <section className="vigi-card p-4" aria-label="Legenda do mapa de hospitais">
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Legenda do mapa de hospitais</h3>
+        <ul className="flex flex-wrap gap-4 text-xs text-gray-600">
+          <li className="flex items-center gap-2">
+            <span className="vigisus-legend-dot vigisus-legend-dot--origem" aria-hidden="true" />
+            Municipio consultado
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="vigisus-legend-dot vigisus-legend-dot--hospital" aria-hidden="true" />
+            Hospital de referencia
+          </li>
+        </ul>
+      </section>
+
       <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 rounded-xl overflow-hidden shadow" style={{ height: 380 }}>
+        <div className="flex-1 rounded-xl overflow-hidden shadow border border-gray-200" style={{ height: 380 }} aria-hidden="true">
           <MapContainer
             center={[latOrigem, lonOrigem]}
             zoom={8}
@@ -75,7 +89,7 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="© OpenStreetMap"
+              attribution="OpenStreetMap"
             />
             <FitBounds coords={coords} />
 
@@ -128,11 +142,12 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
             </div>
           ) : (
             hospitais.map((hospital, index) => (
-              <div
+              <article
                 key={`${hospital.nome || "hospital-card"}-${hospital.nuLatitude}-${hospital.nuLongitude}-${index}`}
                 className={`bg-white rounded-xl shadow p-4 border-l-4 ${
                   index === 0 ? "border-red-500" : "border-gray-200"
                 }`}
+                aria-label={`Hospital ${hospital.nome || "sem nome"}`}
               >
                 <div className="flex items-start justify-between mb-1">
                   <p className="text-sm font-semibold text-gray-800 leading-tight">
@@ -159,11 +174,45 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
                     Telefone: {hospital.telefone}
                   </a>
                 )}
-              </div>
+              </article>
             ))
           )}
         </div>
       </div>
+
+      <section className="vigi-card p-4" aria-label="Tabela acessivel de hospitais">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Tabela acessivel de hospitais</h3>
+        {hospitais.length === 0 ? (
+          <p className="text-sm text-gray-500">Sem hospitais disponiveis para exibir.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-200">
+                  <th className="py-2 pr-3">Hospital</th>
+                  <th className="py-2 pr-3">Distancia (km)</th>
+                  <th className="py-2 pr-3">Leitos SUS</th>
+                  <th className="py-2 pr-3">Infectologia</th>
+                  <th className="py-2 pr-3">Telefone</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hospitais.map((hospital, index) => (
+                  <tr key={`${hospital.nome || "hospital-row"}-${index}`} className="border-b border-gray-100">
+                    <td className="py-2 pr-3">{hospital.nome || "-"}</td>
+                    <td className="py-2 pr-3">
+                      {typeof hospital.distanciaKm === "number" ? hospital.distanciaKm.toFixed(1) : "-"}
+                    </td>
+                    <td className="py-2 pr-3">{hospital.leitosSus ?? "-"}</td>
+                    <td className="py-2 pr-3">{hospital.servicoInfectologia ? "Sim" : "Nao"}</td>
+                    <td className="py-2 pr-3">{hospital.telefone || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

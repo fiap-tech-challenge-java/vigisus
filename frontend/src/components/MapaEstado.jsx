@@ -10,14 +10,6 @@ const COR_RISCO = {
   SEM_DADO: "#D1D5DB",
 };
 
-const EMOJI_RISCO = {
-  EPIDEMIA: "🔴",
-  ALTO: "🟠",
-  MODERADO: "🟡",
-  BAIXO: "🟢",
-  SEM_DADO: "⚪",
-};
-
 const ESTADOS = {
   AC: { cod: 12, center: [-9.0, -70.8] },
   AL: { cod: 27, center: [-9.7, -36.7] },
@@ -49,6 +41,14 @@ const ESTADOS = {
 };
 
 const GEOJSON_CACHE = new Map();
+const NIVEIS = ["EPIDEMIA", "ALTO", "MODERADO", "BAIXO", "SEM_DADO"];
+const LABEL_NIVEL = {
+  EPIDEMIA: "Epidemia",
+  ALTO: "Alto",
+  MODERADO: "Moderado",
+  BAIXO: "Baixo",
+  SEM_DADO: "Sem dado",
+};
 
 const normalizarNome = (valor) =>
   String(valor || "")
@@ -75,6 +75,7 @@ export default function MapaEstado({
   const codEstado = estado.cod;
   const center = isBrasil ? [-14.2, -52.0] : estado.center;
   const zoom = isBrasil ? 4 : 6;
+  const fallbackClassificacao = "SEM_DADO";
 
   useEffect(() => {
     if (!isBrasil && !codEstado) {
@@ -110,7 +111,7 @@ export default function MapaEstado({
         if (ativo) {
           setGeojson(data);
         }
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) {
           return;
         }
@@ -132,8 +133,6 @@ export default function MapaEstado({
       controller.abort();
     };
   }, [codEstado, isBrasil]);
-
-  const fallbackClassificacao = "SEM_DADO";
 
   const classificacaoMap = useMemo(() => {
     const map = {};
@@ -200,6 +199,16 @@ export default function MapaEstado({
     return map;
   }, [ranking, isBrasil]);
 
+  const contagemPorNivel = useMemo(() => {
+    const contagem = { EPIDEMIA: 0, ALTO: 0, MODERADO: 0, BAIXO: 0, SEM_DADO: 0 };
+    Object.values(classificacaoMap).forEach((nivelClassificacao) => {
+      if (contagem[nivelClassificacao] != null) {
+        contagem[nivelClassificacao] += 1;
+      }
+    });
+    return contagem;
+  }, [classificacaoMap]);
+
   const estilizarFeature = (feature) => {
     if (!feature?.properties) {
       return {
@@ -213,13 +222,11 @@ export default function MapaEstado({
     const cod = isBrasil
       ? String(feature.properties.sigla || "").toUpperCase()
       : String(feature.properties.id || feature.properties.codarea || "").padStart(7, "0");
-
     const nomeFeature = feature.properties.name || feature.properties.nomearea || "";
     const classificacao =
       classificacaoMap[cod] ||
       classificacaoPorNome[normalizarNome(nomeFeature)] ||
       fallbackClassificacao;
-
     const isDestaque = cod === String(coIbgeDestaque || "").padStart(7, "0");
 
     return {
@@ -239,7 +246,6 @@ export default function MapaEstado({
     const cod = isBrasil
       ? String(feature.properties.sigla || "").toUpperCase()
       : String(feature.properties.id || feature.properties.codarea || "").padStart(7, "0");
-
     const nomeFeature = feature.properties.name || feature.properties.nomearea || "";
     const classificacao =
       classificacaoMap[cod] ||
@@ -270,12 +276,12 @@ export default function MapaEstado({
     const nome = feature.properties.name || feature.properties.nomearea || "Desconhecido";
     const tooltip = item
       ? `<div class="font-bold">${nome}</div>
-         <div>${EMOJI_RISCO[classificacao]} ${classificacao}</div>
+         <div>${LABEL_NIVEL[classificacao] || classificacao}</div>
          <div class="text-xs text-gray-500">
-           ${item.totalCasos || 0} casos · ${(item.incidencia100k ?? item.incidencia ?? 0).toFixed(1)}/100k
+           ${item.totalCasos || 0} casos - ${(item.incidencia100k ?? item.incidencia ?? 0).toFixed(1)}/100k
          </div>`
       : `<div class="font-bold">${nome}</div>
-         <div>⚪ SEM_DADO</div>`;
+         <div>Sem dado</div>`;
 
     layer.bindTooltip(tooltip, { sticky: true });
 
@@ -286,7 +292,7 @@ export default function MapaEstado({
 
   if (loading) {
     return (
-      <div className="h-80 bg-gray-100 rounded-xl flex items-center justify-center">
+      <div className="h-80 bg-gray-100 rounded-xl flex items-center justify-center" role="status" aria-live="polite">
         <p className="text-sm text-gray-400 animate-pulse">Carregando mapa...</p>
       </div>
     );
@@ -294,7 +300,7 @@ export default function MapaEstado({
 
   if (erro || !geojson) {
     return (
-      <div className="h-80 bg-gray-50 rounded-xl flex flex-col items-center justify-center border border-gray-200">
+      <div className="h-80 bg-gray-50 rounded-xl flex flex-col items-center justify-center border border-gray-200" role="alert">
         <p className="text-sm text-gray-400">{erro || "Mapa indisponivel"}</p>
         <p className="text-xs text-gray-300 mt-1">Tente recarregar a pagina</p>
       </div>
@@ -303,7 +309,7 @@ export default function MapaEstado({
 
   return (
     <div>
-      <div className="rounded-xl overflow-hidden shadow-sm border border-gray-200" style={{ height: 420 }}>
+      <div className="rounded-xl overflow-hidden shadow-sm border border-gray-200" style={{ height: 420 }} aria-hidden="true">
         <MapContainer
           center={center}
           zoom={zoom}
@@ -313,47 +319,60 @@ export default function MapaEstado({
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="© OpenStreetMap"
+            attribution="OpenStreetMap"
             opacity={0.25}
           />
           <GeoJSON data={geojson} style={estilizarFeature} onEachFeature={onEachFeature} />
         </MapContainer>
       </div>
 
-      <div className="flex gap-3 justify-center mt-4 flex-wrap px-4 py-2 bg-white rounded-lg">
-        {["EPIDEMIA", "ALTO", "MODERADO", "BAIXO", "SEM_DADO"].map((nivelItem) => (
-          <div key={nivelItem} className="flex items-center gap-2 text-xs font-medium text-gray-700">
-            <span>{EMOJI_RISCO[nivelItem]}</span>
-            <div
-              className="w-4 h-4 rounded border border-gray-300"
-              style={{ backgroundColor: COR_RISCO[nivelItem] }}
-            />
-            <span>{nivelItem}</span>
-          </div>
-        ))}
-      </div>
+      <section className="mt-4 vigi-card p-4" aria-label="Legenda do mapa epidemiologico">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Legenda do mapa</h3>
+        <ul className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          {NIVEIS.map((nivelItem) => (
+            <li key={nivelItem} className="flex items-center gap-2 text-xs text-gray-700">
+              <span
+                className="inline-block w-3.5 h-3.5 rounded border border-gray-300"
+                style={{ backgroundColor: COR_RISCO[nivelItem] }}
+                aria-hidden="true"
+              />
+              <span>{LABEL_NIVEL[nivelItem]}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-gray-500 mt-3">
+          Modo: {isBrasil ? "Brasil (por estado)" : `Estado ${ufUpper} (por municipio)`}. Regioes com classificacao:{" "}
+          {Object.keys(classificacaoMap).length}.
+        </p>
+      </section>
 
-      <div className="mt-2 text-xs text-gray-500 text-center">
-        Modo: {isBrasil ? "Brasil (por estado)" : `Estado ${ufUpper} (por municipio)`} · geometrias:{" "}
-        {geojson?.features?.length || 0} · com classificacao: {Object.keys(classificacaoMap).length}
-      </div>
+      <section className="mt-3 vigi-card p-4" aria-label="Resumo textual do mapa">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Resumo textual para acessibilidade</h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          {NIVEIS.map((nivelItem) => (
+            <div key={nivelItem} className="px-3 py-2 rounded-md bg-gray-50 border border-gray-200">
+              <p className="font-semibold text-gray-700">{LABEL_NIVEL[nivelItem]}</p>
+              <p className="text-gray-500">{contagemPorNivel[nivelItem] || 0} regioes</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {risco && (
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="text-sm font-semibold text-blue-900 mb-2">
+        <section className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg" aria-label="Risco futuro agregado">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">
             Risco Futuro (14 dias)
-          </div>
-          <div className="flex flex-col gap-3 text-sm text-blue-800">
-            <div>
-              <span className="font-medium">Classificacao:</span> {EMOJI_RISCO[risco.classificacao]}{" "}
-              {risco.classificacao}
-            </div>
-            <div>
+          </h3>
+          <div className="flex flex-col gap-2 text-sm text-blue-800">
+            <p>
+              <span className="font-medium">Classificacao:</span> {risco.classificacao}
+            </p>
+            <p>
               <span className="font-medium">Score:</span> {risco.score}/8
-            </div>
+            </p>
             {risco.fatores && risco.fatores.length > 0 && (
               <div>
-                <span className="font-medium">Fatores:</span>
+                <p className="font-medium">Fatores:</p>
                 <ul className="ml-4 mt-1 list-disc text-xs">
                   {risco.fatores.slice(0, 3).map((fator, index) => (
                     <li key={index}>{fator}</li>
@@ -362,7 +381,7 @@ export default function MapaEstado({
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

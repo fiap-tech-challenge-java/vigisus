@@ -25,15 +25,16 @@ const ANO_ATUAL = new Date().getFullYear();
 
 function SectionTitle({ icone, titulo }) {
   return (
-    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+    <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
       {icone} {titulo}
-    </p>
+    </h2>
   );
 }
 
 function SectionSkeleton({ linhas = 3 }) {
   return (
-    <div className="bg-white rounded-xl p-4 animate-pulse space-y-3">
+    <div className="bg-white rounded-xl p-4 animate-pulse space-y-3" role="status" aria-live="polite">
+      <span className="sr-only">Carregando secao</span>
       {Array.from({ length: linhas }).map((_, i) => (
         <div
           key={i}
@@ -47,21 +48,21 @@ function SectionSkeleton({ linhas = 3 }) {
 
 function SectionErro() {
   return (
-    <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-sm text-gray-400 text-center">
+    <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-sm text-gray-400 text-center" role="alert">
       Dados indisponiveis
     </div>
   );
 }
 
-function mapHospital(h) {
+function mapHospital(hospital) {
   return {
-    nome: h.noFantasia || h.nome || "Hospital sem nome",
-    leitosSus: h.qtLeitosSus ?? h.leitosSus ?? null,
-    telefone: h.nuTelefone || h.telefone || null,
-    distanciaKm: h.distanciaKm ?? null,
-    servicoInfectologia: h.servicoInfectologia ?? false,
-    nuLatitude: h.nuLatitude ?? null,
-    nuLongitude: h.nuLongitude ?? null,
+    nome: hospital.noFantasia || hospital.nome || "Hospital sem nome",
+    leitosSus: hospital.qtLeitosSus ?? hospital.leitosSus ?? null,
+    telefone: hospital.nuTelefone || hospital.telefone || null,
+    distanciaKm: hospital.distanciaKm ?? null,
+    servicoInfectologia: hospital.servicoInfectologia ?? false,
+    nuLatitude: hospital.nuLatitude ?? null,
+    nuLongitude: hospital.nuLongitude ?? null,
   };
 }
 
@@ -85,7 +86,6 @@ export default function Atual() {
   const [rankingEstado, setRankingEstado] = useState([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState(null);
-  // "pending" = aguardando geo | "city" = carregar dados | "brasil" = estado neutro
   const [geoState, setGeoState] = useState(hasUrlParams ? "city" : "pending");
 
   const requestRef = useRef({ id: 0, controller: null });
@@ -113,18 +113,14 @@ export default function Atual() {
     }
   };
 
-  useEffect(() => {
-    return () => requestRef.current.controller?.abort();
-  }, []);
+  useEffect(() => () => requestRef.current.controller?.abort(), []);
 
-  // Quando usuario pesquisa via TopNav enquanto estava no estado brasil ou pendente
   useEffect(() => {
     if (hasUrlParams && geoState !== "city") {
       setGeoState("city");
     }
   }, [hasUrlParams, geoState]);
 
-  // Tenta detectar a cidade real do usuario uma unica vez na abertura da pagina
   useEffect(() => {
     if (hasUrlParams) {
       return;
@@ -146,14 +142,11 @@ export default function Atual() {
         clearTimeout(timer);
 
         try {
-          const res = await fetch(
+          const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
           );
-          const data = await res.json();
-          const city =
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.municipality;
+          const data = await response.json();
+          const city = data.address?.city || data.address?.town || data.address?.municipality;
           const uf = (data.address?.["ISO3166-2-lvl4"] || "").replace("BR-", "");
 
           if (city && uf) {
@@ -327,7 +320,6 @@ export default function Atual() {
   };
 
   const perfil = dados?.perfil || {};
-
   const hoje = new Date();
   const em14dias = new Date(hoje.getTime() + 14 * 24 * 60 * 60 * 1000);
   const formatarData = (data) =>
@@ -358,12 +350,12 @@ export default function Atual() {
     return (
       <div className="min-h-screen vigi-page">
         <TopNav loading />
-        <div className="flex flex-col items-center justify-center h-80 gap-3">
-          <p className="text-gray-400 text-sm animate-pulse">
+        <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center h-80 gap-3">
+          <p className="text-gray-400 text-sm animate-pulse" aria-live="polite">
             Detectando sua localizacao...
           </p>
           <p className="text-xs text-gray-300">Voce tambem pode pesquisar acima.</p>
-        </div>
+        </main>
       </div>
     );
   }
@@ -372,11 +364,11 @@ export default function Atual() {
     return (
       <div className="min-h-screen vigi-page">
         <TopNav loading />
-        <div className="flex flex-col items-center justify-center h-[70vh] gap-5">
-          <p className="text-gray-400 text-sm animate-pulse">
+        <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center h-[70vh] gap-5">
+          <p className="text-gray-400 text-sm animate-pulse" aria-live="polite">
             Carregando dados do Brasil...
           </p>
-        </div>
+        </main>
       </div>
     );
   }
@@ -384,158 +376,157 @@ export default function Atual() {
   return (
     <div className="min-h-screen vigi-page">
       <TopNav loading={loading} />
-
-      {erro && (
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">
-            {erro}
+      <main id="main-content" tabIndex={-1}>
+        {erro && (
+          <div className="max-w-4xl mx-auto px-4 py-4" aria-live="assertive">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600" role="alert">
+              {erro}
+            </div>
           </div>
+        )}
+
+        <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center justify-between">
+          <p className="text-xs text-gray-400" aria-live="polite">
+            {perfil?.municipio
+              ? `${perfil.municipio} - ${perfil.uf} - ${perfil.doenca}`
+              : "Carregando..."}
+          </p>
+          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">
+            Atual e Previsao
+          </span>
         </div>
-      )}
-
-      <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center justify-between">
-        <p className="text-xs text-gray-400">
-          {perfil?.municipio
-            ? `${perfil.municipio} · ${perfil.uf} · ${perfil.doenca}`
-            : "Carregando..."}
-        </p>
-        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">
-          Atual e Previsao
-        </span>
-      </div>
-
-      {(() => {
-        const fallback = renderizarSkeletonOuErro(2);
-        if (fallback) {
-          return <div className="px-6 py-5">{fallback}</div>;
-        }
-        return <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />;
-      })()}
-
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-        {(() => {
-          const fallback = renderizarSkeletonOuErro(5);
-          if (fallback) {
-            return fallback;
-          }
-          return (
-            <OQueFazerAgora
-              perfil={perfilMapped}
-              textoIa={dados?.textoIa}
-              ranking={rankingEstado}
-              risco={dados?.risco}
-            />
-          );
-        })()}
 
         {(() => {
           const fallback = renderizarSkeletonOuErro(2);
           if (fallback) {
-            return fallback;
+            return <div className="px-6 py-5">{fallback}</div>;
           }
-          return <StatusRapido perfil={perfilMapped} risco={dados?.risco} />;
+          return <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />;
         })()}
 
-        {(() => {
-          const fallback = renderizarSkeletonOuErro(2);
-          if (fallback) {
-            return fallback;
-          }
-          return <KpiCards perfil={perfilMapped} risco={dados?.risco} />;
-        })()}
-
-        <section>
-          <SectionTitle icone="Curva" titulo="Evolucao dos casos" />
+        <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
           {(() => {
             const fallback = renderizarSkeletonOuErro(5);
             if (fallback) {
               return fallback;
             }
             return (
-              <Suspense fallback={<SectionSkeleton linhas={5} />}>
-                <CurvaEpidemiologica perfil={perfil} />
-              </Suspense>
+              <OQueFazerAgora
+                perfil={perfilMapped}
+                textoIa={dados?.textoIa}
+                ranking={rankingEstado}
+                risco={dados?.risco}
+              />
             );
           })()}
-        </section>
 
-        <section>
-          <SectionTitle
-            icone="Clima"
-            titulo={`Risco climatico - ${formatarData(hoje)} a ${formatarData(em14dias)}`}
-          />
           {(() => {
-            const fallback = renderizarSkeletonOuErro(3);
+            const fallback = renderizarSkeletonOuErro(2);
             if (fallback) {
               return fallback;
             }
-            return (
-              <Suspense fallback={<SectionSkeleton linhas={3} />}>
-                <RiscoFuturo risco={dados?.risco} />
-              </Suspense>
-            );
+            return <StatusRapido perfil={perfilMapped} risco={dados?.risco} />;
           })()}
-        </section>
 
-        <section>
-          <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
           {(() => {
-            const fallback = renderizarSkeletonOuErro(4);
+            const fallback = renderizarSkeletonOuErro(2);
             if (fallback) {
               return fallback;
             }
-            return (
-              <Suspense fallback={<SectionSkeleton linhas={4} />}>
-                <MapaEstado
-                  uf={perfil?.uf}
-                  nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
-                  coIbgeDestaque={perfil?.coIbge}
-                  ranking={rankingEstado}
-                  risco={dados?.risco}
-                />
-              </Suspense>
-            );
+            return <KpiCards perfil={perfilMapped} risco={dados?.risco} />;
           })()}
-        </section>
 
-        <section>
-          <SectionTitle icone="Hospitais" titulo="Infraestrutura disponivel" />
-          {(() => {
-            const fallback = renderizarSkeletonOuErro(3);
-            if (fallback) {
-              return fallback;
-            }
-            return (
-              <Suspense fallback={<SectionSkeleton linhas={3} />}>
-                <MapaHospitais
-                  perfil={perfilMapped}
-                  encaminhamento={encaminhamentoMapped}
-                />
-              </Suspense>
-            );
-          })()}
-        </section>
+          <section aria-label="Evolucao de casos">
+            <SectionTitle icone="Curva" titulo="Evolucao dos casos" />
+            {(() => {
+              const fallback = renderizarSkeletonOuErro(5);
+              if (fallback) {
+                return fallback;
+              }
+              return (
+                <Suspense fallback={<SectionSkeleton linhas={5} />}>
+                  <CurvaEpidemiologica perfil={perfil} />
+                </Suspense>
+              );
+            })()}
+          </section>
 
-        <section>
-          <SectionTitle icone="Resumo" titulo="Resumo operacional" />
-          {(() => {
-            const fallback = renderizarSkeletonOuErro(4);
-            if (fallback) {
-              return fallback;
-            }
-            return (
-              <Suspense fallback={<SectionSkeleton linhas={4} />}>
-                <ResumoIa
-                  textoIa={dados?.textoIa}
-                  perfil={perfilMapped}
-                  ranking={rankingEstado}
-                  risco={dados?.risco}
-                />
-              </Suspense>
-            );
-          })()}
-        </section>
-      </div>
+          <section aria-label="Risco climatico">
+            <SectionTitle
+              icone="Clima"
+              titulo={`Risco climatico - ${formatarData(hoje)} a ${formatarData(em14dias)}`}
+            />
+            {(() => {
+              const fallback = renderizarSkeletonOuErro(3);
+              if (fallback) {
+                return fallback;
+              }
+              return (
+                <Suspense fallback={<SectionSkeleton linhas={3} />}>
+                  <RiscoFuturo risco={dados?.risco} />
+                </Suspense>
+              );
+            })()}
+          </section>
+
+          <section aria-label="Mapa regional">
+            <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
+            {(() => {
+              const fallback = renderizarSkeletonOuErro(4);
+              if (fallback) {
+                return fallback;
+              }
+              return (
+                <Suspense fallback={<SectionSkeleton linhas={4} />}>
+                  <MapaEstado
+                    uf={perfil?.uf}
+                    nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
+                    coIbgeDestaque={perfil?.coIbge}
+                    ranking={rankingEstado}
+                    risco={dados?.risco}
+                  />
+                </Suspense>
+              );
+            })()}
+          </section>
+
+          <section aria-label="Mapa e lista de hospitais">
+            <SectionTitle icone="Hospitais" titulo="Infraestrutura disponivel" />
+            {(() => {
+              const fallback = renderizarSkeletonOuErro(3);
+              if (fallback) {
+                return fallback;
+              }
+              return (
+                <Suspense fallback={<SectionSkeleton linhas={3} />}>
+                  <MapaHospitais perfil={perfilMapped} encaminhamento={encaminhamentoMapped} />
+                </Suspense>
+              );
+            })()}
+          </section>
+
+          <section aria-label="Resumo operacional">
+            <SectionTitle icone="Resumo" titulo="Resumo operacional" />
+            {(() => {
+              const fallback = renderizarSkeletonOuErro(4);
+              if (fallback) {
+                return fallback;
+              }
+              return (
+                <Suspense fallback={<SectionSkeleton linhas={4} />}>
+                  <ResumoIa
+                    textoIa={dados?.textoIa}
+                    perfil={perfilMapped}
+                    ranking={rankingEstado}
+                    risco={dados?.risco}
+                  />
+                </Suspense>
+              );
+            })()}
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
+

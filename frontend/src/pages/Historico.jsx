@@ -19,17 +19,16 @@ const IAHistorico = lazy(() => import("../components/IAHistorico"));
 
 function SectionTitle({ icone, titulo }) {
   return (
-    <div className="flex items-center gap-3 mb-4 border-l-4 border-blue-300 pl-3">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-        {icone} {titulo}
-      </p>
-    </div>
+    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+      {icone} {titulo}
+    </h2>
   );
 }
 
 function SectionSkeleton({ linhas = 3 }) {
   return (
-    <div className="bg-white rounded-xl p-4 animate-pulse space-y-3">
+    <div className="bg-white rounded-xl p-4 animate-pulse space-y-3" role="status" aria-live="polite">
+      <span className="sr-only">Carregando secao</span>
       {Array.from({ length: linhas }).map((_, i) => (
         <div
           key={i}
@@ -90,9 +89,7 @@ export default function Historico() {
     }
   };
 
-  useEffect(() => {
-    return () => requestRef.current.controller?.abort();
-  }, []);
+  useEffect(() => () => requestRef.current.controller?.abort(), []);
 
   useEffect(() => {
     if (!searchParams.get("ano")) {
@@ -217,14 +214,14 @@ export default function Historico() {
 
   if (loading) {
     return (
-      <>
+      <div className="min-h-screen vigi-page">
         <TopNav loading />
-        <div className="min-h-screen vigi-page flex items-center justify-center">
-          <p className="text-gray-400 text-sm animate-pulse">
+        <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center">
+          <p className="text-gray-400 text-sm animate-pulse" aria-live="polite">
             Carregando dados historicos...
           </p>
-        </div>
-      </>
+        </main>
+      </div>
     );
   }
 
@@ -232,11 +229,11 @@ export default function Historico() {
     return (
       <div className="min-h-screen vigi-page">
         <TopNav />
-        <div className="max-w-4xl mx-auto px-6 py-10">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">
+        <main id="main-content" tabIndex={-1} className="max-w-4xl mx-auto px-6 py-10">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600" role="alert">
             {erro}
           </div>
-        </div>
+        </main>
       </div>
     );
   }
@@ -255,88 +252,100 @@ export default function Historico() {
   return (
     <div className="min-h-screen vigi-page">
       <TopNav loading={loading} />
-
-      <div className="bg-slate-700 text-white px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-300 uppercase tracking-wider mb-0.5">
-              Modo Historico
-            </p>
-            <h1 className="text-lg font-bold">
-              {perfil?.municipio} - {perfil?.uf}
-            </h1>
-            <p className="text-sm text-slate-300">
-              {perfil?.doenca?.charAt(0).toUpperCase() + perfil?.doenca?.slice(1)} - {perfil?.ano || anoParam}
-            </p>
+      <main id="main-content" tabIndex={-1}>
+        <header className="bg-slate-700 text-white px-6 py-4">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-300 uppercase tracking-wider mb-0.5">
+                Modo Historico
+              </p>
+              <h1 className="text-lg font-bold">
+                {perfil?.municipio} - {perfil?.uf}
+              </h1>
+              <p className="text-sm text-slate-300">
+                {perfil?.doenca?.charAt(0).toUpperCase() + perfil?.doenca?.slice(1)} - {perfil?.ano || anoParam}
+              </p>
+            </div>
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-slate-400">Total de casos</p>
+              <p className="text-2xl font-black">
+                {perfil?.total?.toLocaleString("pt-BR") ?? "-"}
+              </p>
+              <p className="text-xs text-slate-300">{perfil?.classificacao}</p>
+            </div>
           </div>
-          <div className="text-right hidden sm:block">
-            <p className="text-xs text-slate-400">Total de casos</p>
-            <p className="text-2xl font-black">
-              {perfil?.total?.toLocaleString("pt-BR") ?? "-"}
-            </p>
-            <p className="text-xs text-slate-300">{perfil?.classificacao}</p>
-          </div>
-        </div>
-      </div>
+        </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-        <section>
-          <SectionTitle icone="IA" titulo="Analise de IA - periodo historico" />
-          <Suspense fallback={<SectionSkeleton linhas={4} />}>
-            <IAHistorico
-              textoIa={dados?.textoIa}
-              ano={perfil?.ano || anoParam}
-              perfil={perfilMapped}
-              ranking={rankingEstado}
-            />
-          </Suspense>
-        </section>
-
-        <KpisHistorico perfil={perfilMapped} />
-        <KpiCards perfil={perfilMapped} modoHistorico />
-
-        <section>
-          <SectionTitle icone="Dados" titulo="Resumo anual selecionado" />
-          <Suspense fallback={<SectionSkeleton linhas={4} />}>
-            <ComparacaoAnual
-              coIbge={perfil?.coIbge}
-              uf={perfil?.uf}
-              doenca={perfil?.doenca || doencaParam}
-              escopo={municipioParam ? "municipio" : ((perfil?.uf || ufParam) === "BR" ? "brasil" : "estado")}
-              anoBase={Number(perfil?.ano || anoParam)}
-              totalAnoSelecionado={perfil?.total}
-            />
-          </Suspense>
-        </section>
-
-        <section>
-          <SectionTitle icone="Curva" titulo="Evolucao dos casos" />
-          <Suspense fallback={<SectionSkeleton linhas={5} />}>
-            <CurvaEpidemiologica perfil={perfil} />
-          </Suspense>
-        </section>
-
-        <section>
-          <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
-          <Suspense fallback={<SectionSkeleton linhas={4} />}>
-            <MapaEstado
-              uf={perfil?.uf}
-              nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
-              coIbgeDestaque={perfil?.coIbge}
-              ranking={rankingEstado}
-            />
-          </Suspense>
-        </section>
-
-        {rankingEstado?.length > 0 && (
-          <section>
-            <SectionTitle icone="Ranking" titulo="Ranking territorial" />
-            <Suspense fallback={<SectionSkeleton linhas={6} />}>
-              <TabelaRanking ranking={rankingEstado} />
+        <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
+          <section aria-label="Analise historica por IA">
+            <div className="mb-4 border-l-4 border-blue-300 pl-3">
+              <SectionTitle icone="IA" titulo="Analise de IA - periodo historico" />
+            </div>
+            <Suspense fallback={<SectionSkeleton linhas={4} />}>
+              <IAHistorico
+                textoIa={dados?.textoIa}
+                ano={perfil?.ano || anoParam}
+                perfil={perfilMapped}
+                ranking={rankingEstado}
+              />
             </Suspense>
           </section>
-        )}
-      </div>
+
+          <KpisHistorico perfil={perfilMapped} />
+          <KpiCards perfil={perfilMapped} modoHistorico />
+
+          <section aria-label="Comparacao anual">
+            <div className="mb-4 border-l-4 border-blue-300 pl-3">
+              <SectionTitle icone="Dados" titulo="Resumo anual selecionado" />
+            </div>
+            <Suspense fallback={<SectionSkeleton linhas={4} />}>
+              <ComparacaoAnual
+                coIbge={perfil?.coIbge}
+                uf={perfil?.uf}
+                doenca={perfil?.doenca || doencaParam}
+                escopo={municipioParam ? "municipio" : ((perfil?.uf || ufParam) === "BR" ? "brasil" : "estado")}
+                anoBase={Number(perfil?.ano || anoParam)}
+                totalAnoSelecionado={perfil?.total}
+              />
+            </Suspense>
+          </section>
+
+          <section aria-label="Curva de casos">
+            <div className="mb-4 border-l-4 border-blue-300 pl-3">
+              <SectionTitle icone="Curva" titulo="Evolucao dos casos" />
+            </div>
+            <Suspense fallback={<SectionSkeleton linhas={5} />}>
+              <CurvaEpidemiologica perfil={perfil} />
+            </Suspense>
+          </section>
+
+          <section aria-label="Mapa regional">
+            <div className="mb-4 border-l-4 border-blue-300 pl-3">
+              <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
+            </div>
+            <Suspense fallback={<SectionSkeleton linhas={4} />}>
+              <MapaEstado
+                uf={perfil?.uf}
+                nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
+                coIbgeDestaque={perfil?.coIbge}
+                ranking={rankingEstado}
+              />
+            </Suspense>
+          </section>
+
+          {rankingEstado?.length > 0 && (
+            <section aria-label="Ranking territorial">
+              <div className="mb-4 border-l-4 border-blue-300 pl-3">
+                <SectionTitle icone="Ranking" titulo="Ranking territorial" />
+              </div>
+              <Suspense fallback={<SectionSkeleton linhas={6} />}>
+                <TabelaRanking ranking={rankingEstado} />
+              </Suspense>
+            </section>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
+
