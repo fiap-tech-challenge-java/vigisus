@@ -2,10 +2,9 @@
 run_all.py
 Orquestra a execução completa do pipeline de ingestão de dados do VígiSUS.
 Ordem de execução:
-  1. ingest_municipios
-  2. ingest_populacao
-  3. ingest_cnes
-  4. ingest_sinan_dengue
+    1. ingest_municipios
+    2. ingest_populacao
+    3. ingest_planilhas_saude (ST/LT/SR/DENG em CSV/Excel)
 
 Pode ser agendado via cron: 0 2 * * 0 (domingo às 2h)
 """
@@ -19,8 +18,7 @@ logger = logging.getLogger(__name__)
 STEPS = [
     ("ingest_municipios", "Municípios IBGE"),
     ("ingest_populacao", "População IBGE"),
-    ("ingest_cnes", "CNES (estabelecimentos, leitos, serviços)"),
-    ("ingest_sinan_dengue", "SINAN Dengue"),
+    ("ingest_planilhas_saude", "Planilhas ST/LT/SR/DENG (CSV/Excel)"),
 ]
 
 
