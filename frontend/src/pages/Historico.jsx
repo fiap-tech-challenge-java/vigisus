@@ -8,7 +8,7 @@ import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
 import MapaEstado from "../components/MapaEstado";
 import TabelaRanking from "../components/TabelaRanking";
 import IAHistorico from "../components/IAHistorico";
-import { buscarMunicipio, buscarRankingEstado } from "../services/api";
+import { buscarMunicipio, buscarRankingEstado, buscarBrasil, buscarHistoricoEstado } from "../services/api";
 
 // Historico NUNCA mostra: InterpretacaoOperacional, MapaHospitais,
 // RiscoFuturo — apenas dados do período selecionado.
@@ -25,18 +25,27 @@ function SectionTitle({ icone, titulo }) {
 
 
 const ANO_ATUAL = new Date().getFullYear();
+const ANO_HISTORICO_PADRAO = ANO_ATUAL - 1;
 
 export default function Historico() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const municipioParam = searchParams.get("municipio");
   const ufParam        = searchParams.get("uf")     || "MG";
-  const anoParam       = Number(searchParams.get("ano")) || 2024;
+  const anoParam       = Number(searchParams.get("ano")) || ANO_HISTORICO_PADRAO;
   const doencaParam    = searchParams.get("doenca") || "dengue";
 
   const [dados, setDados]                 = useState(null);
   const [rankingEstado, setRankingEstado] = useState([]);
   const [loading, setLoading]             = useState(true);
+
+  useEffect(() => {
+    if (!searchParams.get("ano")) {
+      const p = new URLSearchParams(searchParams);
+      p.set("ano", String(ANO_HISTORICO_PADRAO));
+      setSearchParams(p, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     carregar(municipioParam, ufParam, doencaParam, anoParam);
@@ -45,12 +54,55 @@ export default function Historico() {
   const carregar = async (municipio, uf, doenca, ano) => {
     setLoading(true);
     try {
-      const resp = municipio
-        ? await buscarMunicipio(municipio, uf, doenca, ano)
-        : await buscarMunicipio("Belo Horizonte", uf, doenca, ano);
-      setDados(resp);
-      const ranking = await buscarRankingEstado(uf, doenca, ano);
-      setRankingEstado(ranking?.ranking || []);
+      if (municipio) {
+        const resp = await buscarMunicipio(municipio, uf, doenca, ano);
+        setDados(resp);
+        const ranking = await buscarRankingEstado(resp?.perfil?.uf || uf, ano, doenca);
+        setRankingEstado(ranking?.ranking || []);
+      } else if ((uf || "").toUpperCase() === "BR") {
+        const resp = await buscarBrasil(doenca, ano);
+        setDados({
+          perfil: {
+            coIbge: "00",
+            municipio: "Brasil",
+            uf: "BR",
+            doenca,
+            ano,
+            total: resp?.totalCasos || 0,
+            incidencia: resp?.incidencia || 0,
+            classificacao: resp?.classificacao || "SEM_DADO",
+            tendencia: resp?.tendencia || "ESTAVEL",
+            semanas: resp?.semanas || [],
+            semanasAnoAnterior: resp?.semanasAnoAnterior || [],
+          },
+          textoIa: resp?.textoIa || `Panorama histórico do Brasil para ${doenca} em ${ano}.`,
+        });
+        setRankingEstado(resp?.estadosPiores || []);
+      } else {
+        const [ranking, perfilEstado] = await Promise.all([
+          buscarRankingEstado(uf, ano, doenca),
+          buscarHistoricoEstado(uf, ano, doenca),
+        ]);
+        const lista = ranking?.ranking || [];
+
+        setDados({
+          perfil: {
+            coIbge: uf,
+            municipio: `Estado ${uf}`,
+            uf,
+            doenca,
+            ano,
+            total: perfilEstado?.total || 0,
+            incidencia: perfilEstado?.incidencia || 0,
+            classificacao: perfilEstado?.classificacao || "SEM_DADO",
+            tendencia: perfilEstado?.tendencia || "ESTAVEL",
+            semanas: perfilEstado?.semanas || [],
+            semanasAnoAnterior: perfilEstado?.semanasAnoAnterior || [],
+          },
+          textoIa: `Resumo histórico do estado ${uf} para ${doenca} em ${ano}: ${perfilEstado?.total?.toLocaleString("pt-BR") || 0} casos e incidência de ${(perfilEstado?.incidencia || 0).toFixed(1)} por 100 mil habitantes.`,
+        });
+        setRankingEstado(lista);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -58,8 +110,8 @@ export default function Historico() {
     }
   };
 
-  // Ano recente → redireciona para /atual (após todos os hooks)
-  if (anoParam >= ANO_ATUAL - 1) {
+  // Ano atual fica no modo /atual
+  if (anoParam >= ANO_ATUAL) {
     const p = new URLSearchParams({ uf: ufParam, doenca: doencaParam });
     if (municipioParam) p.append("municipio", municipioParam);
     return <Navigate to={`/atual?${p}`} replace />;
@@ -132,10 +184,12 @@ export default function Historico() {
 
         {/* 4. Comparação interanual — barras Chart.js */}
         <section>
-          <SectionTitle icone="📊" titulo="Comparação anual (últimos 5 anos)" />
+          <SectionTitle icone="📊" titulo="Resumo anual selecionado" />
           <ComparacaoAnual
             coIbge={perfil?.coIbge}
             anoBase={Number(perfil?.ano || anoParam)}
+            somenteAnoSelecionado={true}
+            totalAnoSelecionado={perfil?.total}
           />
         </section>
 
@@ -150,6 +204,7 @@ export default function Historico() {
           <SectionTitle icone="🗺️" titulo="Distribuição regional" />
           <MapaEstado
             uf={perfil?.uf}
+            nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
             coIbgeDestaque={perfil?.coIbge}
             ranking={rankingEstado}
           />

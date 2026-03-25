@@ -83,7 +83,7 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
             </Marker>
 
             {/* Marcadores dos hospitais */}
-            {hospitais.filter(h => h.nuLatitude).map((h, i) => (
+            {hospitais.filter(h => h.nuLatitude && h.nuLongitude).map((h, i) => (
               <Marker
                 key={i}
                 position={[h.nuLatitude, h.nuLongitude]}
@@ -91,10 +91,10 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
               >
                 <Popup>
                   <strong>{h.nome}</strong><br/>
-                  📏 {h.distanciaKm} km<br/>
-                  🛏️ {h.leitosSus} leitos SUS<br/>
+                  {typeof h.distanciaKm === "number" && <>📏 {h.distanciaKm.toFixed(1)} km<br/></>}
+                  {h.leitosSus != null && <>🛏️ {h.leitosSus} leitos SUS<br/></>}
                   {h.servicoInfectologia && "🦠 Infectologia ✅"}<br/>
-                  📞 {h.telefone}
+                  {h.telefone ? `📞 ${h.telefone}` : "📞 Não informado"}
                 </Popup>
               </Marker>
             ))}
@@ -105,7 +105,7 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
         <div className="w-full md:w-80 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: 380 }}>
           {hospitais.length === 0 ? (
             <div className="bg-white rounded-xl shadow p-4 text-sm text-gray-400 text-center">
-              Nenhum hospital encontrado no raio de 300km
+              Nenhum hospital encontrado para esta região
             </div>
           ) : (
             hospitais.map((h, i) => (
@@ -126,8 +126,8 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                  <span>📏 {h.distanciaKm} km</span>
-                  <span>🛏️ {h.leitosSus} leitos SUS</span>
+                  {typeof h.distanciaKm === "number" && <span>📏 {h.distanciaKm.toFixed(1)} km</span>}
+                  {h.leitosSus != null && <span>🛏️ {h.leitosSus} leitos SUS</span>}
                   {h.servicoInfectologia && <span>🦠 Infectologia</span>}
                 </div>
                 {h.telefone && (

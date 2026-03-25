@@ -10,7 +10,15 @@ import RiscoFuturo from "../components/RiscoFuturo";
 import MapaEstado from "../components/MapaEstado";
 import MapaHospitais from "../components/MapaHospitais";
 import ResumoIa from "../components/ResumoIa";
-import { buscarMunicipio, buscarRankingEstado, buscarBrasil, buscarHospitaisCapitais } from "../services/api";
+import {
+  buscarMunicipio,
+  buscarRankingEstado,
+  buscarBrasil,
+  buscarHospitaisBrasilAgregado,
+  buscarHospitaisEstadoRegiao,
+  buscarRiscoBrasil,
+  buscarRiscoEstado,
+} from "../services/api";
 
 const ANO_ATUAL = new Date().getFullYear();
 
@@ -46,13 +54,13 @@ function SectionErro() {
 
 function mapHospital(h) {
   return {
-    nome: h.noFantasia,
-    leitosSus: h.qtLeitosSus,
-    telefone: h.nuTelefone,
-    distanciaKm: h.distanciaKm,
-    servicoInfectologia: h.servicoInfectologia,
-    nuLatitude: h.nuLatitude,
-    nuLongitude: h.nuLongitude,
+    nome: h.noFantasia || h.nome || "Hospital sem nome",
+    leitosSus: h.qtLeitosSus ?? h.leitosSus ?? null,
+    telefone: h.nuTelefone || h.telefone || null,
+    distanciaKm: h.distanciaKm ?? null,
+    servicoInfectologia: h.servicoInfectologia ?? false,
+    nuLatitude: h.nuLatitude ?? null,
+    nuLongitude: h.nuLongitude ?? null,
   };
 }
 
@@ -131,6 +139,8 @@ export default function Atual() {
     if (geoState === "city") {
       if (municipioParam) {
         carregar(municipioParam, ufParam, doencaParam);
+      } else if (ufParam === "BR") {
+        carregarBrasil(doencaParam);
       } else if (ufParam) {
         carregarEstado(ufParam, doencaParam);
       }
@@ -159,7 +169,16 @@ export default function Atual() {
     setLoading(true);
     setErro(null);
     try {
-      const resp = await buscarBrasil(doenca, ANO_ATUAL);
+      if (!searchParams.get("uf") || searchParams.get("uf") !== "BR") {
+        setSearchParams({ uf: "BR", doenca }, { replace: true });
+      }
+
+      const [resp, riscoAg, hospitaisBrasil] = await Promise.all([
+        buscarBrasil(doenca, ANO_ATUAL),
+        buscarRiscoBrasil(),
+        buscarHospitaisBrasilAgregado(),
+      ]);
+      
       setDados({
         perfil: {
           municipio: "Brasil",
@@ -174,8 +193,8 @@ export default function Atual() {
           ano: ANO_ATUAL,
         },
         textoIa: resp.textoIa,
-        risco: null,
-        encaminhamento: { hospitais: (resp.hospitais || []).map(mapHospital) },
+        risco: riscoAg,
+        encaminhamento: { hospitais: (hospitaisBrasil || []).map(mapHospital) },
         estadosPiores: resp.estadosPiores,
         municipiosPiores: resp.municipiosPiores,
       });
@@ -192,8 +211,11 @@ export default function Atual() {
     setLoading(true);
     setErro(null);
     try {
-      const ranking = await buscarRankingEstado(uf, ANO_ATUAL);
-      const hospitais = await buscarHospitaisCapitais(uf);
+      const [ranking, hospitais, riscoAg] = await Promise.all([
+        buscarRankingEstado(uf, ANO_ATUAL),
+        buscarHospitaisEstadoRegiao(uf),
+        buscarRiscoEstado(uf),
+      ]);
       
       // Calcula agregado do estado a partir do ranking
       const totalCasos = ranking?.ranking?.reduce((sum, m) => sum + (m.totalCasos || 0), 0) || 0;
@@ -221,7 +243,7 @@ export default function Atual() {
           ano: ANO_ATUAL,
         },
         textoIa: `Estado ${uf} registrou ${totalCasos} casos de ${doenca} em ${ANO_ATUAL}, com incidência de ${incidencia.toFixed(1)} por 100 mil habitantes.`,
-        risco: null,
+        risco: riscoAg,
         encaminhamento: { hospitais: (hospitais || []).map(mapHospital) },
       });
       setRankingEstado(ranking?.ranking || []);
@@ -395,8 +417,10 @@ export default function Atual() {
           ) : (
             <MapaEstado
               uf={perfil?.uf}
+              nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
               coIbgeDestaque={perfil?.coIbge}
               ranking={rankingEstado}
+              risco={dados?.risco}
             />
           )}
         </section>

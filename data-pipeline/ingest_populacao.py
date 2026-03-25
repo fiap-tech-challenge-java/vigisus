@@ -6,6 +6,7 @@ Processa 1 município por vez com retry e fallback por UF.
 """
 
 import logging
+import os
 import time
 
 import requests
@@ -20,6 +21,9 @@ BATCH_SIZE = 1
 IBGE_AGREGADO = "6579"
 IBGE_VARIAVEL = "9324"
 IBGE_PERIODO = "2023"
+REQUEST_SLEEP_SECONDS = float(os.environ.get("POP_REQUEST_SLEEP_SECONDS", "0.2"))
+PROGRESS_EVERY = int(os.environ.get("POP_PROGRESS_EVERY", "25"))
+HEARTBEAT_SECONDS = int(os.environ.get("POP_HEARTBEAT_SECONDS", "15"))
 
 POPULACAO_FALLBACK_UF = {
     "AC": 15000, "AL": 30000, "AP": 18000, "AM": 40000,
@@ -71,13 +75,17 @@ def run() -> None:
 
     logger.info("Municípios sem população: %d", len(municipios))
 
+    if not municipios:
+        logger.info("Nenhum município pendente. Etapa de população finalizada sem alterações.")
+        return
+
     atualizados = 0
     fallbacks = 0
+    total = len(municipios)
+    started_at = time.time()
+    last_progress_log_at = 0.0
 
     for i, (co_ibge, sg_uf) in enumerate(municipios, 1):
-        if i % 500 == 0:
-            logger.info("Progresso: %d/%d (ibge=%d, fallback=%d)",
-                        i, len(municipios), atualizados, fallbacks)
 
         pop = fetch_populacao_municipio(co_ibge)
 
@@ -92,9 +100,45 @@ def run() -> None:
                 "UPDATE municipios SET populacao = :pop WHERE co_ibge = :co"
             ), {"pop": pop, "co": co_ibge})
 
-        time.sleep(0.2)
+        if REQUEST_SLEEP_SECONDS > 0:
+            time.sleep(REQUEST_SLEEP_SECONDS)
 
-    logger.info("Concluído: %d via IBGE, %d via fallback", atualizados, fallbacks)
+        now = time.time()
+        should_log = (
+            i == 1
+            or i % PROGRESS_EVERY == 0
+            or (now - last_progress_log_at) >= HEARTBEAT_SECONDS
+            or i == total
+        )
+
+        if should_log:
+            elapsed = max(now - started_at, 0.001)
+            rate = i / elapsed
+            eta_seconds = int((total - i) / rate) if rate > 0 else 0
+            pct = (i / total) * 100
+            eta_min, eta_sec = divmod(eta_seconds, 60)
+            eta_hour, eta_min = divmod(eta_min, 60)
+            logger.info(
+                "População IBGE: %d/%d (%.1f%%) | ibge=%d fallback=%d | vel=%.2f mun/s | ETA=%02d:%02d:%02d",
+                i,
+                total,
+                pct,
+                atualizados,
+                fallbacks,
+                rate,
+                eta_hour,
+                eta_min,
+                eta_sec,
+            )
+            last_progress_log_at = now
+
+    total_elapsed = time.time() - started_at
+    logger.info(
+        "Concluído: %d via IBGE, %d via fallback em %.1fs",
+        atualizados,
+        fallbacks,
+        total_elapsed,
+    )
 
 
 if __name__ == "__main__":

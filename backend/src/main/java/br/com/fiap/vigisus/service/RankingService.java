@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RankingService {
 
-    private static final int MAX_RANKING_LIMIT = 100;
+    private static final int MAX_RANKING_LIMIT = 1000;
     private static final double THRESHOLD_MODERADO = 50.0;
     private static final double THRESHOLD_ALTO = 100.0;
     private static final double THRESHOLD_EPIDEMIA = 300.0;
@@ -32,39 +32,42 @@ public class RankingService {
     public RankingResponse calcularRanking(String uf, String doenca, int ano, int top, String ordem) {
         int topLimitado = Math.min(top, MAX_RANKING_LIMIT);
 
-        List<Municipio> municipios = municipioRepository.findBySgUf(uf.toUpperCase());
+        // ─────────────────────────────────────────────────────────────
+        // OTIMIZAÇÃO: Uma ÚNICA query com JOIN em vez de N+1 queries
+        // ─────────────────────────────────────────────────────────────
+        List<Object[]> rankingData = casoDengueRepository.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);
 
-        List<String> cosMunicipios = municipios.stream()
-                .filter(m -> m.getPopulacao() != null && m.getPopulacao() > 0)
-                .map(Municipio::getCoIbge)
+        List<RankingMunicipioDTO> rankingCompleto = rankingData.stream()
+                .map(row -> {
+                    String coIbge = (String) row[0];
+                    String municipio = (String) row[1];
+                    long totalCasos = ((Number) row[3]).longValue();
+                    long populacao = ((Number) row[4]).longValue();
+                    
+                    double incidencia = populacao > 0 
+                            ? (double) totalCasos / populacao * 100_000 
+                            : 0;
+
+                    return RankingMunicipioDTO.builder()
+                            .coIbge(coIbge)
+                            .municipio(municipio)
+                            .totalCasos(totalCasos)
+                            .populacao(populacao)
+                            .incidencia100k(incidencia)
+                            .classificacao(classificar(incidencia))
+                            .build();
+                })
                 .collect(Collectors.toList());
 
-        Map<String, Long> totalPorMunicipio = buscarTotaisPorMunicipio(cosMunicipios, ano);
-
-        List<RankingMunicipioDTO> rankingCompleto = new ArrayList<>();
-        for (Municipio m : municipios) {
-            if (m.getPopulacao() == null || m.getPopulacao() <= 0) {
-                continue;
-            }
-            long totalCasos = totalPorMunicipio.getOrDefault(m.getCoIbge(), 0L);
-            double incidencia = (double) totalCasos / m.getPopulacao() * 100_000;
-
-            rankingCompleto.add(RankingMunicipioDTO.builder()
-                    .coIbge(m.getCoIbge())
-                    .municipio(m.getNoMunicipio())
-                    .totalCasos(totalCasos)
-                    .populacao(m.getPopulacao())
-                    .incidencia100k(incidencia)
-                    .classificacao(classificar(incidencia))
-                    .build());
-        }
-
+        // Ordenar conforme solicitado
         Comparator<RankingMunicipioDTO> comparator = Comparator.comparingDouble(RankingMunicipioDTO::getIncidencia100k);
-        if (!"melhores".equalsIgnoreCase(ordem)) {
-            comparator = comparator.reversed();
+        if ("melhores".equalsIgnoreCase(ordem)) {
+            rankingCompleto.sort(comparator);
+        } else {
+            rankingCompleto.sort(comparator.reversed());
         }
-        rankingCompleto.sort(comparator);
 
+        // Adicionar posição
         for (int i = 0; i < rankingCompleto.size(); i++) {
             rankingCompleto.get(i).setPosicao(i + 1);
         }
@@ -85,34 +88,28 @@ public class RankingService {
     }
 
     public String calcularPosicaoNoEstado(String coIbge, String uf, String doenca, int ano) {
-        List<Municipio> municipios = municipioRepository.findBySgUf(uf.toUpperCase());
+        // ─────────────────────────────────────────────────────────────
+        // OTIMIZAÇÃO: Uma query otimizada em vez de carregar municipios
+        // ─────────────────────────────────────────────────────────────
+        List<Object[]> rankingData = casoDengueRepository.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);
 
-        List<String> cosMunicipios = municipios.stream()
-                .filter(m -> m.getPopulacao() != null && m.getPopulacao() > 0)
-                .map(Municipio::getCoIbge)
+        List<RankingMunicipioDTO> rankingCompleto = rankingData.stream()
+                .map(row -> {
+                    String coIbgeRow = (String) row[0];
+                    long totalCasos = ((Number) row[3]).longValue();
+                    long populacao = ((Number) row[4]).longValue();
+                    
+                    double incidencia = populacao > 0 
+                            ? (double) totalCasos / populacao * 100_000 
+                            : 0;
+
+                    return RankingMunicipioDTO.builder()
+                            .coIbge(coIbgeRow)
+                            .incidencia100k(incidencia)
+                            .build();
+                })
+                .sorted(Comparator.comparingDouble(RankingMunicipioDTO::getIncidencia100k).reversed())
                 .collect(Collectors.toList());
-
-        if (cosMunicipios.isEmpty()) {
-            return null;
-        }
-
-        Map<String, Long> totalPorMunicipio = buscarTotaisPorMunicipio(cosMunicipios, ano);
-
-        List<RankingMunicipioDTO> rankingCompleto = new ArrayList<>();
-        for (Municipio m : municipios) {
-            if (m.getPopulacao() == null || m.getPopulacao() <= 0) {
-                continue;
-            }
-            long totalCasos = totalPorMunicipio.getOrDefault(m.getCoIbge(), 0L);
-            double incidencia = (double) totalCasos / m.getPopulacao() * 100_000;
-
-            rankingCompleto.add(RankingMunicipioDTO.builder()
-                    .coIbge(m.getCoIbge())
-                    .incidencia100k(incidencia)
-                    .build());
-        }
-
-        rankingCompleto.sort(Comparator.comparingDouble(RankingMunicipioDTO::getIncidencia100k).reversed());
 
         int total = rankingCompleto.size();
         for (int i = 0; i < total; i++) {
@@ -122,18 +119,6 @@ public class RankingService {
         }
 
         return null;
-    }
-
-    private Map<String, Long> buscarTotaisPorMunicipio(List<String> cosMunicipios, int ano) {
-        Map<String, Long> totalPorMunicipio = new HashMap<>();
-        if (!cosMunicipios.isEmpty()) {
-            List<Object[]> resultados = casoDengueRepository
-                    .sumTotalCasosByCoMunicipioInAndAno(cosMunicipios, ano);
-            for (Object[] row : resultados) {
-                totalPorMunicipio.put((String) row[0], ((Number) row[1]).longValue());
-            }
-        }
-        return totalPorMunicipio;
     }
 
     private String classificar(double incidencia) {

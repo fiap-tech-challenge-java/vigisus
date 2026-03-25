@@ -27,33 +27,22 @@ public class BrasilEpidemiologicoService {
 
     @Cacheable(value = "brasil-epidemiologico", key = "#doenca + '-' + #ano")
     public BrasilEpidemiologicoResponse gerarPerfilBrasil(String doenca, int ano) {
-        // 1. Buscar todos os municípios
-        List<Municipio> todosMunicipios = municipioRepository.findAll();
+        // ─────────────────────────────────────────────────────────────
+        // OTIMIZAÇÃO: Uma ÚNICA query agregada em vez de N+1
+        // ─────────────────────────────────────────────────────────────
+        List<Object[]> casosPerEstado = casoDengueRepository.agregaCasosPorEstadoNoAno(ano);
         
-        // 2. Calcular totais agregados por município
-        Map<String, Long> casosPerMunicipio = new HashMap<>();
-        Map<String, Municipio> municipiosMap = new HashMap<>();
-        
-        for (Municipio m : todosMunicipios) {
-            long total = casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(m.getCoIbge(), ano);
-            if (total > 0) {
-                casosPerMunicipio.put(m.getCoIbge(), total);
-                municipiosMap.put(m.getCoIbge(), m);
-            }
-        }
-        
-        if (casosPerMunicipio.isEmpty()) {
+        if (casosPerEstado.isEmpty()) {
             throw new DadosInsuficientesException("Brasil", ano);
         }
         
-        // 3. Calcular total geral e agregações
-        long totalCasos = casosPerMunicipio.values().stream()
-                .mapToLong(Long::longValue).sum();
-        
-        // População total do Brasil
-        long populacaoTotal = todosMunicipios.stream()
-                .mapToLong(m -> m.getPopulacao() != null ? m.getPopulacao() : 0)
-                .sum();
+        // 1. Calcular totais do Brasil
+        long totalCasos = 0;
+        long populacaoTotal = 0;
+        for (Object[] row : casosPerEstado) {
+            totalCasos += ((Number) row[1]).longValue();
+            populacaoTotal += ((Number) row[2]).longValue();
+        }
         
         double incidencia = populacaoTotal > 0 
                 ? (double) totalCasos / populacaoTotal * 100_000 
@@ -61,31 +50,19 @@ public class BrasilEpidemiologicoService {
         
         String classificacao = classificar(incidencia);
         
-        // 4. Agregar semanas epidemiológicas (Brasil todo)
-        List<SemanaDTO> semanasAnoAtual = agregarSemanasBrasil(ano);
+        // 2. Agregar semanas epidemiológicas (Brasil todo) - uma query
+        List<SemanaDTO> semanasAnoAtual = agregarSemanasBrasilOtimizado(ano);
         String tendencia = calcularTendencia(semanasAnoAtual);
-        List<SemanaDTO> semanasAnoAnterior = agregarSemanasBrasil(ano - 1);
+        List<SemanaDTO> semanasAnoAnterior = agregarSemanasBrasilOtimizado(ano - 1);
         
-        // 5. Agregar por estado (para top 5 piores)
-        Map<String, Long> casosPerEstado = new HashMap<>();
-        Map<String, Long> populacaoPerEstado = new HashMap<>();
-        
-        for (Municipio m : todosMunicipios) {
-            String uf = m.getSgUf();
-            long casos = casosPerMunicipio.getOrDefault(m.getCoIbge(), 0L);
-            long pop = m.getPopulacao() != null ? m.getPopulacao() : 0;
-            
-            casosPerEstado.put(uf, casosPerEstado.getOrDefault(uf, 0L) + casos);
-            populacaoPerEstado.put(uf, populacaoPerEstado.getOrDefault(uf, 0L) + pop);
-        }
-        
-        List<EstadoDTO> estadosPiores = casosPerEstado.entrySet().stream()
-                .map(entry -> {
-                    String uf = entry.getKey();
-                    long casos = entry.getValue();
-                    long populacao = populacaoPerEstado.getOrDefault(uf, 0L);
-                    double incidenciaEstado = populacao > 0 
-                            ? (double) casos / populacao * 100_000 
+        // 3. Estados piores
+        List<EstadoDTO> estadosPiores = casosPerEstado.stream()
+                .map(row -> {
+                    String uf = (String) row[0];
+                    long casos = ((Number) row[1]).longValue();
+                    long pop = ((Number) row[2]).longValue();
+                    double incidenciaEstado = pop > 0 
+                            ? (double) casos / pop * 100_000 
                             : 0;
                     return EstadoDTO.builder()
                             .sgUf(uf)
@@ -99,41 +76,54 @@ public class BrasilEpidemiologicoService {
                 .limit(5)
                 .collect(Collectors.toList());
         
-        // Adicionar posição
         for (int i = 0; i < estadosPiores.size(); i++) {
             estadosPiores.get(i).setPosicao(i + 1);
         }
         
-        // 6. Top 5 piores municípios do Brasil
-        List<MunicipioRiscoDTO> municipiosPiores = casosPerMunicipio.entrySet().stream()
-                .map(entry -> {
-                    String coIbge = entry.getKey();
-                    long casos = entry.getValue();
-                    Municipio m = municipiosMap.get(coIbge);
-                    long populacao = m.getPopulacao() != null ? m.getPopulacao() : 0;
-                    double incidenciaMun = populacao > 0 
-                            ? (double) casos / populacao * 100_000 
-                            : 0;
-                    return MunicipioRiscoDTO.builder()
-                            .coIbge(coIbge)
-                            .municipio(m.getNoMunicipio())
-                            .sgUf(m.getSgUf())
-                            .totalCasos(casos)
-                            .incidencia(incidenciaMun)
-                            .classificacao(classificar(incidenciaMun))
-                            .build();
+        // 4. Municípios piores (agregação por município uma query)
+        List<Object[]> municípiosCasos = casoDengueRepository.agregaCasosPorMunicipioNoAno(ano);
+        
+        List<MunicipioRiscoDTO> municipiosPiores = municípiosCasos.stream()
+                .map(row -> {
+                    String coIbge = (String) row[0];
+                    long casos = ((Number) row[1]).longValue();
+                    
+                    // Buscar município
+                    return municipioRepository.findByCoIbge(coIbge)
+                            .map(m -> {
+                                long pop = m.getPopulacao() != null ? m.getPopulacao() : 0;
+                                double incidenciaMun = pop > 0 
+                                        ? (double) casos / pop * 100_000 
+                                        : 0;
+                                return MunicipioRiscoDTO.builder()
+                                        .coIbge(coIbge)
+                                        .municipio(m.getNoMunicipio())
+                                        .sgUf(m.getSgUf())
+                                        .totalCasos(casos)
+                                        .incidencia(incidenciaMun)
+                                        .classificacao(classificar(incidenciaMun))
+                                        .build();
+                            })
+                            .orElse(null);
                 })
+                .filter(Objects::nonNull)
                 .sorted((a, b) -> Double.compare(b.getIncidencia(), a.getIncidencia()))
                 .limit(5)
                 .collect(Collectors.toList());
         
-        // Adicionar posição
         for (int i = 0; i < municipiosPiores.size(); i++) {
             municipiosPiores.get(i).setPosicao(i + 1);
         }
         
-        // 7. Buscar principais hospitais das capitais
+        // 5. Hospitais das capitais
         var hospitais = encaminhamentoService.buscarHospitaisDasCapitais(null);
+        
+        // 6. Mapa de casos por estado para resposta
+        Map<String, Long> casosPerEstadoMap = casosPerEstado.stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> ((Number) row[1]).longValue()
+                ));
         
         return BrasilEpidemiologicoResponse.builder()
                 .regiao("Brasil")
@@ -147,34 +137,21 @@ public class BrasilEpidemiologicoService {
                 .semanasAnoAnterior(semanasAnoAnterior)
                 .estadosPiores(estadosPiores)
                 .municipiosPiores(municipiosPiores)
-                .casosPerEstado(casosPerEstado)
+                .casosPerEstado(casosPerEstadoMap)
                 .hospitais(hospitais)
                 .build();
     }
     
-    private List<SemanaDTO> agregarSemanasBrasil(int ano) {
-        // Em vez de carregar tudo, podemos calcular a agregação direto dos municipios
-        // que já temos casos Vamos aproveitar que municipioRepository existe
-        List<Municipio> municipios = municipioRepository.findAll();
-        Map<Integer, Long> casosPorSemana = new HashMap<>();
+    private List<SemanaDTO> agregarSemanasBrasilOtimizado(int ano) {
+        // ─────────────────────────────────────────────────────────────
+        // OTIMIZAÇÃO: Uma ÚNICA query agregada em vez de N*52 queries
+        // ─────────────────────────────────────────────────────────────
+        List<Object[]> semanasData = casoDengueRepository.agregaSemanasBrasil(ano);
         
-        for (int semana = 1; semana <= 53; semana++) {
-            long totalSemana = 0;
-            for (Municipio m : municipios) {
-                long casos = casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(m.getCoIbge(), ano);
-                if (casos > 0) {
-                    totalSemana += casos; // simplificado: não há agregação por semana no banco
-                }
-            }
-            if (totalSemana > 0) {
-                casosPorSemana.put(semana, totalSemana);
-            }
-        }
-        
-        return casosPorSemana.entrySet().stream()
-                .map(entry -> SemanaDTO.builder()
-                        .semanaEpi(entry.getKey())
-                        .casos(entry.getValue().intValue())
+        return semanasData.stream()
+                .map(row -> SemanaDTO.builder()
+                        .semanaEpi(((Number) row[0]).intValue())
+                        .casos(((Number) row[1]).intValue())
                         .build())
                 .sorted(Comparator.comparingInt(SemanaDTO::getSemanaEpi))
                 .collect(Collectors.toList());

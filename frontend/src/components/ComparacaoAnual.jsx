@@ -15,12 +15,18 @@ import { buscarPerfil } from "../services/api";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-export default function ComparacaoAnual({ anoBase, coIbge }) {
+export default function ComparacaoAnual({ anoBase, coIbge, somenteAnoSelecionado = false, totalAnoSelecionado = null }) {
   const [totais, setTotais] = useState({});
   const [carregando, setCarregando] = useState(false);
 
   useEffect(() => {
-    if (!coIbge || !anoBase) return;
+    if (somenteAnoSelecionado) {
+      setTotais({ [anoBase]: totalAnoSelecionado ?? 0 });
+      return;
+    }
+
+    if (!anoBase) return;
+    if (!coIbge) return;
 
     setCarregando(true);
     const anos = Array.from({ length: 5 }, (_, i) => anoBase - 4 + i);
@@ -49,9 +55,11 @@ export default function ComparacaoAnual({ anoBase, coIbge }) {
         setTotais(mapa);
       })
       .finally(() => setCarregando(false));
-  }, [coIbge, anoBase]);
+  }, [coIbge, anoBase, somenteAnoSelecionado, totalAnoSelecionado]);
 
-  const anos = Array.from({ length: 5 }, (_, i) => anoBase - 4 + i);
+  const anos = somenteAnoSelecionado
+    ? [anoBase]
+    : Array.from({ length: 5 }, (_, i) => anoBase - 4 + i);
 
   const data = {
     labels: anos.map(String),
@@ -90,15 +98,18 @@ export default function ComparacaoAnual({ anoBase, coIbge }) {
     },
   };
 
-  if (!coIbge || !anoBase) return null;
+  if (!anoBase) return null;
+  if (!somenteAnoSelecionado && !coIbge) return null;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mx-6 max-w-6xl md:mx-auto">
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-        📊 Comparação anual
+        {somenteAnoSelecionado ? "📊 Total do ano selecionado" : "📊 Comparação anual"}
       </p>
       <p className="text-xs text-slate-400 mb-4">
-        Últimos 5 anos — barra vermelha indica {anoBase}
+        {somenteAnoSelecionado
+          ? `Ano selecionado: ${anoBase} (sem carregar outros anos)`
+          : `Últimos 5 anos — barra vermelha indica ${anoBase}`}
       </p>
 
       {carregando ? (

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @RestControllerAdvice
@@ -70,6 +71,19 @@ public class GlobalExceptionHandler {
         body.put("mensagem", ex.getMessage());
         body.put("timestamp", LocalDateTime.now().toString());
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
+    }
+
+    @ExceptionHandler(CompletionException.class)
+    public ResponseEntity<Map<String, Object>> handleCompletionException(CompletionException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof DadosInsuficientesException dadosEx) {
+            return handleDadosInsuficientesException(dadosEx);
+        }
+        if (cause instanceof MunicipioNotFoundException municipioEx) {
+            return handleMunicipioNotFoundException(municipioEx);
+        }
+
+        return handleGenericException(ex);
     }
 
     @ExceptionHandler(Exception.class)

@@ -17,6 +17,7 @@ public class PrevisaoRiscoResponse {
     private String municipio;
     private int score;
     private String classificacao;
+    private Double incidencia;          // Incidência histórica (média de cidades)
     private List<String> fatores;
     private String textoIa;
 

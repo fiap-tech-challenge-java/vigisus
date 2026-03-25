@@ -27,9 +27,14 @@ export const buscarSituacaoAtual = async (uf = "MG", top = 6) => {
   }
 };
 
-export const buscarRankingEstado = async (uf, ano = 2024) => {
+export const buscarRankingEstado = async (uf, ano = new Date().getFullYear(), doenca = "dengue") => {
   // top=853 cobre todos os municípios do maior estado (MG), retornando o estado completo
-  const res = await api.get(`/api/ranking?uf=${uf}&doenca=dengue&ano=${ano}&top=853`);
+  const res = await api.get(`/api/ranking?uf=${uf}&doenca=${doenca}&ano=${ano}&top=853`);
+  return res.data;
+};
+
+export const buscarHistoricoEstado = async (uf, ano = new Date().getFullYear(), doenca = "dengue") => {
+  const res = await api.get(`/api/ranking/estado-historico?uf=${uf}&doenca=${doenca}&ano=${ano}`);
   return res.data;
 };
 
@@ -49,11 +54,44 @@ export const buscarBrasil = async (doenca = "dengue", ano = null) => {
   return res.data;
 };
 
-export const buscarHospitaisCapitais = async (uf = null) => {
-  const params = new URLSearchParams();
-  if (uf) params.append("uf", uf);
-  const res = await api.get(`/api/hospitais/capitais?${params}`);
-  return res.data || [];
+export const buscarRiscoBrasil = async () => {
+  try {
+    const res = await api.get('/api/previsao-risco/brasil/risco-agregado');
+    return res.data;
+  } catch (err) {
+    console.warn("buscarRiscoBrasil falhou:", err?.response?.status, err?.message);
+    return null;
+  }
+};
+
+export const buscarRiscoEstado = async (uf) => {
+  try {
+    const res = await api.get(`/api/previsao-risco/estado/${uf}/risco-agregado`);
+    return res.data;
+  } catch (err) {
+    console.warn("buscarRiscoEstado falhou:", err?.response?.status, err?.message);
+    return null;
+  }
+};
+
+export const buscarHospitaisBrasilAgregado = async () => {
+  try {
+    const res = await api.get('/api/previsao-risco/brasil/hospitais-capitais');
+    return res.data || [];
+  } catch (err) {
+    console.warn("buscarHospitaisBrasilAgregado falhou:", err?.response?.status, err?.message);
+    return [];
+  }
+};
+
+export const buscarHospitaisEstadoRegiao = async (uf) => {
+  try {
+    const res = await api.get(`/api/previsao-risco/estado/${uf}/hospitais-regiao`);
+    return res.data || [];
+  } catch (err) {
+    console.warn("buscarHospitaisEstadoRegiao falhou:", err?.response?.status, err?.message);
+    return [];
+  }
 };
 
 export default api;

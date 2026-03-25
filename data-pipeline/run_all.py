@@ -22,20 +22,39 @@ STEPS = [
 ]
 
 
-def run_step(module_name: str, label: str) -> None:
+def run_step(module_name: str, label: str, step_index: int, total_steps: int) -> None:
     import importlib
 
-    logger.info(">>> Iniciando etapa: %s", label)
+    step_pct = (step_index / total_steps) * 100
+    logger.info(
+        ">>> [%d/%d | %.0f%%] Iniciando etapa: %s",
+        step_index,
+        total_steps,
+        step_pct,
+        label,
+    )
     start = time.time()
     try:
         mod = importlib.import_module(module_name)
         mod.run()
         elapsed = time.time() - start
-        logger.info("<<< Etapa '%s' concluída em %.1fs", label, elapsed)
+        logger.info(
+            "<<< [%d/%d] Etapa '%s' concluída em %.1fs",
+            step_index,
+            total_steps,
+            label,
+            elapsed,
+        )
     except Exception as exc:
         elapsed = time.time() - start
         logger.error(
-            "<<< Etapa '%s' falhou após %.1fs: %s", label, elapsed, exc, exc_info=True
+            "<<< [%d/%d] Etapa '%s' falhou após %.1fs: %s",
+            step_index,
+            total_steps,
+            label,
+            elapsed,
+            exc,
+            exc_info=True,
         )
         raise
 
@@ -43,9 +62,12 @@ def run_step(module_name: str, label: str) -> None:
 def run() -> None:
     logger.info("===== Pipeline VígiSUS iniciado =====")
     total_start = time.time()
+    total_steps = len(STEPS)
 
-    for module_name, label in STEPS:
-        run_step(module_name, label)
+    for idx, (module_name, label) in enumerate(STEPS, 1):
+        run_step(module_name, label, idx, total_steps)
+        overall_pct = (idx / total_steps) * 100
+        logger.info("... Progresso geral do pipeline: %.0f%% (%d/%d)", overall_pct, idx, total_steps)
 
     total_elapsed = time.time() - total_start
     logger.info("===== Pipeline VígiSUS concluído em %.1fs =====", total_elapsed)

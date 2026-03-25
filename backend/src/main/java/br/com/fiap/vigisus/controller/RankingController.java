@@ -1,6 +1,8 @@
 package br.com.fiap.vigisus.controller;
 
 import br.com.fiap.vigisus.dto.RankingResponse;
+import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
+import br.com.fiap.vigisus.service.EstadoHistoricoService;
 import br.com.fiap.vigisus.service.RankingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +23,7 @@ import java.time.LocalDate;
 public class RankingController {
 
     private final RankingService rankingService;
+    private final EstadoHistoricoService estadoHistoricoService;
 
     @GetMapping
     @Operation(
@@ -47,5 +50,22 @@ public class RankingController {
         }
 
         return rankingService.calcularRanking(uf, doenca, ano, top, ordem);
+    }
+
+    @GetMapping("/estado-historico")
+    @Operation(
+            summary = "Histórico agregado do estado por semana",
+            description = "Retorna série semanal, total anual, incidência e classificação agregadas para o estado informado."
+    )
+    public PerfilEpidemiologicoResponse getHistoricoEstado(
+            @RequestParam String uf,
+            @RequestParam(defaultValue = "dengue") String doenca,
+            @RequestParam(required = false) Integer ano) {
+
+        if (ano == null) {
+            ano = LocalDate.now().getYear();
+        }
+
+        return estadoHistoricoService.gerarPerfilEstado(uf, doenca, ano);
     }
 }

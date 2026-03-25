@@ -31,6 +31,7 @@ SPREADSHEET_DIR = os.environ.get("SPREADSHEET_DIR", "csv_input")
 SPREADSHEET_FALLBACK_DIR = os.environ.get("SPREADSHEET_FALLBACK_DIR", "data/csv")
 
 SUPPORTED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
+PROGRESS_LOG_EVERY_CHUNKS = int(os.environ.get("PLANILHAS_PROGRESS_EVERY_CHUNKS", "3"))
 
 ALIASES = {
     "co_cnes": ["CO_CNES", "CNES"],
@@ -51,6 +52,39 @@ ALIASES = {
     "semana_epi": ["SEM_NOT", "SEMANA_EPI", "SEMANA_EPIDEMIOLOGICA", "SEM_PRI"],
     "dt_notific": ["DT_NOTIFIC", "DT_SIN_PRI"],
 }
+
+
+class PlanilhasProgressTracker:
+    def __init__(self, total_files: int):
+        self.total_files = max(total_files, 1)
+        self.done_files = 0
+
+    def start_file(self, group: str, file_index: int, group_total: int, path: Path) -> None:
+        global_index = self.done_files + 1
+        pct = (global_index / self.total_files) * 100
+        logger.info(
+            "[%s %d/%d] Iniciando arquivo %s | progresso global de arquivos: %.1f%% (%d/%d)",
+            group,
+            file_index,
+            group_total,
+            path,
+            pct,
+            global_index,
+            self.total_files,
+        )
+
+    def finish_file(self, group: str, path: Path, rows: int) -> None:
+        self.done_files += 1
+        pct = (self.done_files / self.total_files) * 100
+        logger.info(
+            "[%s] Arquivo concluido: %s (%d linhas) | progresso global de arquivos: %.1f%% (%d/%d)",
+            group,
+            path,
+            rows,
+            pct,
+            self.done_files,
+            self.total_files,
+        )
 
 
 def _normalize_col(col: str) -> str:
@@ -259,13 +293,19 @@ def _resolve_municipio_series(
     return resolved
 
 
-def _prepare_estabelecimentos(paths: list[Path], resolver) -> list[dict]:
+def _prepare_estabelecimentos(paths: list[Path], resolver, progress: PlanilhasProgressTracker | None = None) -> list[dict]:
     records = {}
-    for path in paths:
+    total_paths = len(paths)
+    for idx, path in enumerate(paths, 1):
+        if progress:
+            progress.start_file("ST", idx, total_paths, path)
+
         mapped, available = _build_column_lookup(path)
         required = ["co_cnes", "co_municipio"]
         if not all(k in mapped for k in required):
             logger.warning("Arquivo ST ignorado (colunas mínimas ausentes): %s", path)
+            if progress:
+                progress.finish_file("ST", path, 0)
             continue
 
         use_cols = [mapped[k] for k in mapped]
@@ -295,17 +335,25 @@ def _prepare_estabelecimentos(paths: list[Path], resolver) -> list[dict]:
             }
 
         logger.info("ST processado: %s (%d linhas, %d colunas)", path, len(df), len(available))
+        if progress:
+            progress.finish_file("ST", path, len(df))
 
     return list(records.values())
 
 
-def _prepare_leitos(paths: list[Path], resolver) -> list[dict]:
+def _prepare_leitos(paths: list[Path], resolver, progress: PlanilhasProgressTracker | None = None) -> list[dict]:
     out = []
-    for path in paths:
+    total_paths = len(paths)
+    for idx, path in enumerate(paths, 1):
+        if progress:
+            progress.start_file("LT", idx, total_paths, path)
+
         mapped, available = _build_column_lookup(path)
         required = ["co_cnes", "tp_leito"]
         if not all(k in mapped for k in required):
             logger.warning("Arquivo LT ignorado (colunas mínimas ausentes): %s", path)
+            if progress:
+                progress.finish_file("LT", path, 0)
             continue
 
         use_cols = [mapped[k] for k in mapped]
@@ -330,17 +378,25 @@ def _prepare_leitos(paths: list[Path], resolver) -> list[dict]:
             )
 
         logger.info("LT processado: %s (%d linhas, %d colunas)", path, len(df), len(available))
+        if progress:
+            progress.finish_file("LT", path, len(df))
 
     return out
 
 
-def _prepare_servicos(paths: list[Path], resolver) -> list[dict]:
+def _prepare_servicos(paths: list[Path], resolver, progress: PlanilhasProgressTracker | None = None) -> list[dict]:
     out = []
-    for path in paths:
+    total_paths = len(paths)
+    for idx, path in enumerate(paths, 1):
+        if progress:
+            progress.start_file("SR", idx, total_paths, path)
+
         mapped, available = _build_column_lookup(path)
         required = ["co_cnes", "serv_esp", "class_sr"]
         if not all(k in mapped for k in required):
             logger.warning("Arquivo SR ignorado (colunas mínimas ausentes): %s", path)
+            if progress:
+                progress.finish_file("SR", path, 0)
             continue
 
         use_cols = [mapped[k] for k in mapped]
@@ -363,6 +419,8 @@ def _prepare_servicos(paths: list[Path], resolver) -> list[dict]:
             )
 
         logger.info("SR processado: %s (%d linhas, %d colunas)", path, len(df), len(available))
+        if progress:
+            progress.finish_file("SR", path, len(df))
 
     return out
 
@@ -396,14 +454,21 @@ def _aggregate_dengue(
     resolver,
     all_codes: set[str],
     unique_prefix_map: dict[str, str],
+    progress: PlanilhasProgressTracker | None = None,
 ) -> list[dict]:
     grouped = defaultdict(int)
 
-    for path in paths:
+    total_paths = len(paths)
+    for idx, path in enumerate(paths, 1):
+        if progress:
+            progress.start_file("DENG", idx, total_paths, path)
+
         mapped, available = _build_column_lookup(path)
         required = ["co_municipio", "semana_epi"]
         if not all(k in mapped for k in required):
             logger.warning("Arquivo DENG ignorado (colunas mínimas ausentes): %s", path)
+            if progress:
+                progress.finish_file("DENG", path, 0)
             continue
 
         use_cols = [mapped[k] for k in mapped]
@@ -428,9 +493,19 @@ def _aggregate_dengue(
             iterator = [pd.read_excel(path, usecols=use_cols, dtype=str)]
 
         total_rows = 0
-        for chunk in iterator:
+        for chunk_idx, chunk in enumerate(iterator, 1):
             chunk = chunk.rename(columns={v: k for k, v in mapped.items()})
             total_rows += len(chunk)
+
+            if chunk_idx == 1 or chunk_idx % PROGRESS_LOG_EVERY_CHUNKS == 0:
+                logger.info(
+                    "[DENG %d/%d] %s | chunks lidos: %d | linhas acumuladas: %d",
+                    idx,
+                    total_paths,
+                    path,
+                    chunk_idx,
+                    total_rows,
+                )
 
             # Processamento vetorizado para evitar iteracao linha a linha em arquivos grandes.
             chunk["co_municipio"] = _resolve_municipio_series(
@@ -489,6 +564,8 @@ def _aggregate_dengue(
                 grouped[(row["co_municipio"], int(row["ano"]), int(row["semana_epi"]))] += int(row["total"])
 
         logger.info("DENG processado: %s (%d linhas, %d colunas)", path, total_rows, len(available))
+        if progress:
+            progress.finish_file("DENG", path, total_rows)
 
     return [
         {
@@ -637,23 +714,33 @@ def run() -> None:
             "Sem arquivos, a limpeza nao e executada para evitar esvaziar as tabelas por engano."
         )
 
+    total_files = sum(len(files.get(k, [])) for k in ("ST", "LT", "SR", "DENG"))
+    logger.info("Total de arquivos para processar na etapa de planilhas: %d", total_files)
+    progress = PlanilhasProgressTracker(total_files)
+
     engine = create_engine(DB_URL)
+    logger.info("Fase 1/5: carregando mapas de municipios")
     with engine.connect() as conn:
         resolver = _build_municipio_resolver(conn)
         all_codes, unique_prefix_map = _build_municipio_maps(conn)
 
-    estabelecimentos = _prepare_estabelecimentos(files.get("ST", []), resolver)
-    leitos = _prepare_leitos(files.get("LT", []), resolver)
-    servicos = _prepare_servicos(files.get("SR", []), resolver)
+    logger.info("Fase 2/5: processando arquivos ST")
+    estabelecimentos = _prepare_estabelecimentos(files.get("ST", []), resolver, progress)
+    logger.info("Fase 3/5: processando arquivos LT e SR")
+    leitos = _prepare_leitos(files.get("LT", []), resolver, progress)
+    servicos = _prepare_servicos(files.get("SR", []), resolver, progress)
 
+    logger.info("Fase 4/5: gravando ST/LT/SR no banco")
     with engine.begin() as conn:
         _replace_saude_basica(conn, estabelecimentos, leitos, servicos)
 
+    logger.info("Fase 5/5: processando DENG e gravando casos_dengue")
     casos_dengue = _aggregate_dengue(
         files.get("DENG", []),
         resolver,
         all_codes,
         unique_prefix_map,
+        progress,
     )
 
     with engine.begin() as conn:

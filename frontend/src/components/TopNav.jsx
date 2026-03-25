@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
+const UFS = ["BR","AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
              "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
              "RS","RO","RR","SC","SP","SE","TO"];
-const ANOS = [2024, 2023, 2022, 2021, 2020, 2019, 2018];
+const ANO_ATUAL = new Date().getFullYear();
+const ANO_HISTORICO_PADRAO = String(ANO_ATUAL - 1);
+const ANOS = Array.from({ length: 8 }, (_, i) => ANO_ATUAL - 1 - i);
 
 export default function TopNav() {
   const location  = useLocation();
@@ -17,12 +19,12 @@ export default function TopNav() {
   const [municipio, setMunicipio] = useState(sp.get("municipio") || "");
   const [uf,        setUf]        = useState(sp.get("uf")        || "MG");
   const [doenca,    setDoenca]    = useState(sp.get("doenca")    || "dengue");
-  const [ano,       setAno]       = useState(sp.get("ano")       || "2024");
+  const [ano,       setAno]       = useState(sp.get("ano")       || ANO_HISTORICO_PADRAO);
 
   const buildParams = (overrides = {}) => {
     const p = new URLSearchParams({ uf, doenca });
     if (municipio.trim()) p.set("municipio", municipio.trim());
-    if (isHistorico) p.set("ano", ano);
+    if (isHistorico) p.set("ano", ano || ANO_HISTORICO_PADRAO);
     Object.entries(overrides).forEach(([k, v]) => { if (v) p.set(k, v); });
     return p.toString();
   };
@@ -35,7 +37,7 @@ export default function TopNav() {
   const goToPage = (page) => {
     const p = new URLSearchParams({ uf, doenca });
     if (municipio.trim()) p.set("municipio", municipio.trim());
-    if (page === "/historico") p.set("ano", ano || "2024");
+    if (page === "/historico") p.set("ano", ano || ANO_HISTORICO_PADRAO);
     navigate(`${page}?${p}`);
   };
 
