@@ -142,7 +142,12 @@ function Resultado() {
         {/* 8. RESUMO FINAL — IA */}
         <section>
           <SectionTitle icone="📋" titulo="Resumo operacional" />
-          <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
+          <ResumoIa
+            textoIa={dados?.textoIa}
+            perfil={perfilMapped}
+            ranking={rankingEstado}
+            risco={dados?.risco}
+          />
         </section>
 
       </div>

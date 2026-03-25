@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const UFS = ["BR","AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
@@ -17,9 +17,17 @@ export default function TopNav() {
   const isHistorico = location.pathname === "/historico";
 
   const [municipio, setMunicipio] = useState(sp.get("municipio") || "");
-  const [uf,        setUf]        = useState(sp.get("uf")        || "MG");
+  const [uf,        setUf]        = useState(sp.get("uf")        || "BR");
   const [doenca,    setDoenca]    = useState(sp.get("doenca")    || "dengue");
   const [ano,       setAno]       = useState(sp.get("ano")       || ANO_HISTORICO_PADRAO);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setMunicipio(params.get("municipio") || "");
+    setUf(params.get("uf") || "BR");
+    setDoenca(params.get("doenca") || "dengue");
+    setAno(params.get("ano") || ANO_HISTORICO_PADRAO);
+  }, [location.search, location.pathname]);
 
   const buildParams = (overrides = {}) => {
     const p = new URLSearchParams({ uf, doenca });

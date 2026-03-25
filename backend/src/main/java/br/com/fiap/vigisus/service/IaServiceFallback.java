@@ -18,37 +18,17 @@ public class IaServiceFallback implements IaService {
 
     @Override
     public String gerarTextoEpidemiologico(PerfilEpidemiologicoResponse perfil) {
-        return String.format(
-                "Em %d, %s/%s registrou %d casos de %s, " +
-                "com incidência de %.1f casos por 100 mil habitantes. " +
-                "A situação foi classificada como %s.",
-                perfil.getAno(),
-                perfil.getMunicipio(),
-                perfil.getUf(),
-                perfil.getTotal(),
-                perfil.getDoenca(),
-                perfil.getIncidencia(),
-                perfil.getClassificacao());
+        return TextoAnaliticoHelper.montarTextoEpidemiologico(perfil);
     }
 
     @Override
     public String gerarTextoRisco(PrevisaoRiscoResponse previsao) {
-        List<String> fatores = previsao.getFatores();
-        String fator1 = (fatores != null && !fatores.isEmpty()) ? fatores.get(0) : "N/A";
-        String fator2 = (fatores != null && fatores.size() > 1) ? fatores.get(1) : "N/A";
-        return String.format(
-                "Com base na previsão climática para os próximos 14 dias, " +
-                "%s apresenta risco %s para dengue. " +
-                "Principais fatores: %s, %s.",
-                previsao.getMunicipio(),
-                previsao.getClassificacao(),
-                fator1,
-                fator2);
+        return TextoAnaliticoHelper.montarTextoRisco(previsao);
     }
 
     @Override
     public String gerarTextoOperacional(String contexto) {
-        return "Briefing operacional: " + contexto;
+        return TextoAnaliticoHelper.montarTextoOperacional(contexto);
     }
 
     @Override
@@ -84,7 +64,7 @@ public class IaServiceFallback implements IaService {
     public String gerarTextoTriagem(String prioridade, List<String> sintomas, String alertaEpidemiologico) {
         return String.format(
                 "Prioridade %s. Sintomas relatados: %s. %s " +
-                "Oriente o profissional de saúde conforme protocolo municipal.",
+                "A leitura deve considerar gravidade clinica, contexto epidemiologico e disponibilidade assistencial local.",
                 prioridade, sintomas, alertaEpidemiologico);
     }
 }

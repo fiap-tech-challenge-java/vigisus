@@ -1,15 +1,16 @@
 package br.com.fiap.vigisus.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.genai.Client;
 import br.com.fiap.vigisus.dto.IntencaoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.genai.Client;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Year;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Semaphore;
 
 @Slf4j
@@ -18,9 +19,6 @@ public class IaServiceGeminiImpl implements IaService {
     private final Client geminiClient;
     private final String model;
     private final ObjectMapper objectMapper;
-
-    // Semáforo: 1 chamada concorrente para não estourar quota gratuita
-    // Gemini free tier: 15 RPM — com semaphore(1) fica seguro
     private final Semaphore semaphore = new Semaphore(1);
 
     public IaServiceGeminiImpl(
@@ -32,27 +30,13 @@ public class IaServiceGeminiImpl implements IaService {
         log.info("[IaService] Gemini inicializado com modelo: {}", model);
     }
 
-    // ─────────────────────────────────────────────────
-    // Método central — toda chamada passa aqui
-    // ─────────────────────────────────────────────────
     private String chamarGemini(String prompt) {
         try {
             semaphore.acquire();
             try {
-                log.info("[Gemini] Enviando prompt ({} chars)", prompt.length());
-
-                var response = geminiClient.models.generateContent(
-                    model,
-                    prompt,
-                    null
-                );
-
+                var response = geminiClient.models.generateContent(model, prompt, null);
                 String texto = response.text();
-                log.info("[Gemini] Resposta recebida ({} chars)",
-                    texto != null ? texto.length() : 0);
-
                 return texto != null ? texto.trim() : "";
-
             } finally {
                 semaphore.release();
             }
@@ -66,180 +50,142 @@ public class IaServiceGeminiImpl implements IaService {
         }
     }
 
-    // ─────────────────────────────────────────────────
-    // 1. Texto epidemiológico
-    // ─────────────────────────────────────────────────
     @Override
     public String gerarTextoEpidemiologico(PerfilEpidemiologicoResponse perfil) {
-        String prompt = String.format(
-            "Resuma em 2 linhas apenas os FATOS epidemiológicos abaixo.\n" +
-            "Sem análise, sem recomendação, sem verbos imperativos.\n" +
-            "Use formato claro ponto a ponto.\n\n" +
-            "FATOS:\n" +
-            "- Local: %s, %s\n" +
-            "- Doença: %s em %d\n" +
-            "- Casos notificados ao SINAN: %d\n" +
-            "- Taxa de incidência: %.1f por 100 mil\n" +
-            "- Classificação de risco: %s\n\n" +
-            "Resuma em máximo 2 linhas diretas:",
-            perfil.getMunicipio(), perfil.getUf(),
-            perfil.getDoenca(), perfil.getAno(),
-            perfil.getTotal(), perfil.getIncidencia(),
-            perfil.getClassificacao()
-        );
+        long totalAnterior = TextoAnaliticoHelper.somarCasos(perfil.getSemanasAnoAnterior());
+
+        String prompt = String.format(Locale.US,
+                "Voce e um analista senior de vigilancia epidemiologica do SUS. " +
+                "Escreva uma analise textual clara, util e complementar aos graficos. " +
+                "Traga 3 pequenos paragrafos: " +
+                "(1) leitura do cenario, " +
+                "(2) o que nao fica obvio olhando apenas os numeros, " +
+                "(3) o que merece acompanhamento. " +
+                "Nao invente dados, nao use markdown, nao faca listas, nao diagnostique, nao seja vago. " +
+                "Use no maximo 900 caracteres e linguagem direta.\n\n" +
+                "LOCAL: %s/%s\n" +
+                "DOENCA: %s\n" +
+                "ANO: %d\n" +
+                "TOTAL DE CASOS: %d\n" +
+                "INCIDENCIA: %.1f por 100 mil\n" +
+                "CLASSIFICACAO: %s\n" +
+                "TENDENCIA: %s\n" +
+                "TOTAL ANO ANTERIOR (soma da serie semanal): %d\n" +
+                "POSICAO ESTADUAL: %s\n" +
+                "INCIDENCIA MEDIA DO ESTADO: %s\n\n" +
+                "Texto:",
+                perfil.getMunicipio(),
+                perfil.getUf(),
+                perfil.getDoenca(),
+                perfil.getAno(),
+                perfil.getTotal(),
+                perfil.getIncidencia(),
+                perfil.getClassificacao(),
+                perfil.getTendencia(),
+                totalAnterior,
+                perfil.getPosicaoEstado() != null ? perfil.getPosicaoEstado() : "indisponivel",
+                perfil.getIncidenciaMediaEstado() != null
+                        ? String.format(Locale.US, "%.1f", perfil.getIncidenciaMediaEstado())
+                        : "indisponivel");
 
         String resultado = chamarGemini(prompt);
-        return resultado.isBlank() ? fallbackEpidemiologico(perfil) : resultado;
+        return resultado.isBlank() ? TextoAnaliticoHelper.montarTextoEpidemiologico(perfil) : resultado;
     }
 
-    // ─────────────────────────────────────────────────
-    // 2. Texto de risco climático
-    // ─────────────────────────────────────────────────
     @Override
     public String gerarTextoRisco(PrevisaoRiscoResponse previsao) {
         String fatores = previsao.getFatores() != null
-            ? String.join(", ", previsao.getFatores())
-            : "não informados";
+                ? String.join("; ", previsao.getFatores())
+                : "nao informados";
 
         String prompt = String.format(
-            "Você é um sistema de informação em saúde pública do Brasil. " +
-            "Apresente o contexto de risco epidemiológico de forma objetiva, " +
-            "em no máximo 3 linhas, como um briefing informativo. " +
-            "NÃO use verbos imperativos. NÃO recomende ações. " +
-            "NÃO tome decisões. Apenas organize o contexto. " +
-            "IMPORTANTE: use apenas os dados fornecidos, não invente nada.\n\n" +
-            "Município: %s\n" +
-            "Score de risco: %d/8\n" +
-            "Classificação: %s\n" +
-            "Fatores identificados: %s",
-            previsao.getMunicipio(),
-            previsao.getScore(),
-            previsao.getClassificacao(),
-            fatores
+                "Voce e um analista de risco em saude publica. " +
+                "Explique o risco para as proximas 2 semanas em 2 paragrafos curtos, " +
+                "com linguagem simples, sem listas e sem recomendacoes clinicas. " +
+                "No primeiro, diga o nivel geral. No segundo, explique o que sustenta esse risco e como ele complementa a leitura dos casos recentes. " +
+                "Nao invente nada.\n\n" +
+                "LOCAL: %s\n" +
+                "SCORE: %d/8\n" +
+                "CLASSIFICACAO: %s\n" +
+                "FATORES: %s\n\n" +
+                "Texto:",
+                previsao.getMunicipio(),
+                previsao.getScore(),
+                previsao.getClassificacao(),
+                fatores
         );
 
         String resultado = chamarGemini(prompt);
-        return resultado.isBlank() ? fallbackRisco(previsao) : resultado;
+        return resultado.isBlank() ? TextoAnaliticoHelper.montarTextoRisco(previsao) : resultado;
     }
 
-    // ─────────────────────────────────────────────────
-    // 3. Interpretação de linguagem natural
-    // ─────────────────────────────────────────────────
     @Override
     public IntencaoDTO interpretarPergunta(String pergunta) {
         String prompt = String.format(
-            "Extraia informações de uma pergunta sobre saúde pública no Brasil. " +
-            "Responda APENAS com um JSON válido e compacto, sem markdown, " +
-            "sem bloco de código, sem explicação. Apenas o JSON puro.\n\n" +
-            "Schema obrigatório:\n" +
-            "{\"municipio\":\"nome ou null\",\"uf\":\"sigla 2 letras maiúsculas ou null\"," +
-            "\"doenca\":\"dengue ou chikungunya ou zika ou null\",\"ano\":2024}\n\n" +
-            "Regras:\n" +
-            "- Se não encontrar o município: null\n" +
-            "- Se não encontrar o estado: null\n" +
-            "- Se não encontrar a doença: \"dengue\"\n" +
-            "- Se não encontrar o ano: %d\n" +
-            "- UF deve ter exatamente 2 letras maiúsculas\n\n" +
-            "Pergunta: %s",
-            Year.now().getValue(),
-            pergunta
+                "Extraia informacoes de uma pergunta sobre saude publica no Brasil. " +
+                "Responda apenas com um JSON valido e compacto, sem markdown.\n\n" +
+                "Schema:\n" +
+                "{\"municipio\":\"nome ou null\",\"uf\":\"sigla 2 letras ou null\",\"doenca\":\"dengue ou chikungunya ou zika ou null\",\"ano\":2024}\n\n" +
+                "Regras:\n" +
+                "- se nao houver municipio: null\n" +
+                "- se nao houver UF: null\n" +
+                "- se nao houver doenca: \"dengue\"\n" +
+                "- se nao houver ano: %d\n\n" +
+                "Pergunta: %s",
+                Year.now().getValue(),
+                pergunta
         );
 
         String resposta = chamarGemini(prompt);
-
         try {
-            // Remove markdown que o Gemini às vezes inclui mesmo pedindo para não incluir
-            String json = resposta
-                .replace("```json", "")
-                .replace("```", "")
-                .trim();
-
+            String json = resposta.replace("```json", "").replace("```", "").trim();
             return objectMapper.readValue(json, IntencaoDTO.class);
-
         } catch (Exception e) {
-            log.warn("[Gemini] Falha ao parsear JSON: {} | Resposta bruta: {}",
-                e.getMessage(), resposta);
+            log.warn("[Gemini] Falha ao parsear JSON: {}", e.getMessage());
             return IntencaoDTO.builder()
-                .doenca("dengue")
-                .ano(Year.now().getValue())
-                .build();
+                    .doenca("dengue")
+                    .ano(Year.now().getValue())
+                    .build();
         }
     }
 
-    // ─────────────────────────────────────────────────
-    // 4. Texto de triagem
-    // ─────────────────────────────────────────────────
     @Override
     public String gerarTextoTriagem(String prioridade, List<String> sintomas, String alertaEpidemiologico) {
         String prompt = String.format(
-            "Você é um sistema de informação em saúde pública do Brasil. " +
-            "Com base nos dados abaixo, escreva uma orientação clara " +
-            "em no máximo 3 linhas para o profissional de saúde. " +
-            "NÃO diagnostique. Contextualize o risco de forma objetiva. " +
-            "IMPORTANTE: use apenas os dados fornecidos, não invente nada.\n\n" +
-            "Prioridade: %s\n" +
-            "Sintomas: %s\n" +
-            "Contexto epidemiológico: %s",
-            prioridade,
-            sintomas,
-            alertaEpidemiologico
+                "Voce apoia a triagem de uma unidade do SUS. " +
+                "Escreva uma orientacao em no maximo 4 linhas, sem diagnosticar, " +
+                "com foco em gravidade, contexto epidemiologico e necessidade de observacao. " +
+                "Use apenas os dados fornecidos.\n\n" +
+                "PRIORIDADE: %s\n" +
+                "SINTOMAS: %s\n" +
+                "CONTEXTO: %s\n\n" +
+                "Texto:",
+                prioridade,
+                sintomas,
+                alertaEpidemiologico
         );
 
         String resultado = chamarGemini(prompt);
         if (resultado.isBlank()) {
             return String.format("Prioridade %s. Sintomas relatados: %s. %s",
-                prioridade, sintomas, alertaEpidemiologico);
+                    prioridade, sintomas, alertaEpidemiologico);
         }
         return resultado;
     }
 
-    // ─────────────────────────────────────────────────
-    // 5. Texto operacional
-    // ─────────────────────────────────────────────────
     @Override
     public String gerarTextoOperacional(String contexto) {
         String prompt = String.format(
-            "Você é um sistema de informação em saúde pública do Brasil. " +
-            "Escreva um briefing operacional direto em no máximo 5 linhas " +
-            "para o gestor da unidade de saúde. " +
-            "Inclua: situação atual, tendência e contexto relevante. " +
-            "NÃO use jargões. Seja objetivo e factual. " +
-            "IMPORTANTE: use apenas os dados fornecidos, não invente nada.\n\n" +
-            "Contexto: %s",
-            contexto
+                "Voce escreve briefings operacionais para gestao em saude. " +
+                "Produza um texto de 3 pequenos paragrafos: situacao atual, leitura complementar e ponto de atencao imediato. " +
+                "Nao use listas, nao use jargoes excessivos, nao invente dados. " +
+                "O texto deve complementar o painel, nao repetir mecanicamente cada numero.\n\n" +
+                "CONTEXTO:\n%s\n\n" +
+                "Texto:",
+                contexto
         );
 
         String resultado = chamarGemini(prompt);
-        if (resultado.isBlank()) {
-            return "Briefing operacional: " + contexto;
-        }
-        return resultado;
-    }
-
-    // ─────────────────────────────────────────────────
-    // Fallbacks — usados quando Gemini retorna vazio
-    // ─────────────────────────────────────────────────
-    private String fallbackEpidemiologico(PerfilEpidemiologicoResponse perfil) {
-        return String.format(
-            "%s/%s: %d casos de %s em %d (incidência %.1f/100k). " +
-            "Situação: %s.",
-            perfil.getMunicipio(), perfil.getUf(),
-            perfil.getTotal(), perfil.getDoenca(), perfil.getAno(),
-            perfil.getIncidencia(), perfil.getClassificacao()
-        );
-    }
-
-    private String fallbackRisco(PrevisaoRiscoResponse previsao) {
-        String fatores = previsao.getFatores() != null && !previsao.getFatores().isEmpty()
-            ? String.join(", ", previsao.getFatores())
-            : "Clima favorável ao vetor";
-            
-        return String.format(
-            "Risco no %s: %s (score %d/8). Fatores: %s.",
-            previsao.getMunicipio(),
-            previsao.getClassificacao(),
-            previsao.getScore(),
-            fatores
-        );
+        return resultado.isBlank() ? TextoAnaliticoHelper.montarTextoOperacional(contexto) : resultado;
     }
 }

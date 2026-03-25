@@ -7,8 +7,8 @@ const api = axios.create({
 export const buscarPorPergunta = (pergunta) =>
   api.post('/api/busca', { pergunta });
 
-export const buscarPerfil = (coIbge, ano) =>
-  api.get(`/api/perfil/${coIbge}`, { params: { ano } });
+export const buscarPerfil = (coIbge, ano, doenca = "dengue") =>
+  api.get(`/api/perfil/${coIbge}`, { params: { ano, doenca } });
 
 export const buscarRisco = (coIbge) =>
   api.get(`/api/previsao-risco/${coIbge}`);

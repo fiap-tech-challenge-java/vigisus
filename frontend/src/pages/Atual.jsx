@@ -367,7 +367,12 @@ export default function Atual() {
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
 
         {/* 2. O que fazer agora — tomada de decisão com IA */}
-        <OQueFazerAgora perfil={perfil} textoIa={dados?.textoIa} />
+        <OQueFazerAgora
+          perfil={perfilMapped}
+          textoIa={dados?.textoIa}
+          ranking={rankingEstado}
+          risco={dados?.risco}
+        />
 
         {/* 3. Status rápido — 3 métricas compactas */}
         <StatusRapido perfil={perfilMapped} risco={dados?.risco} />
@@ -448,7 +453,12 @@ export default function Atual() {
           ) : erro ? (
             <SectionErro />
           ) : (
-            <ResumoIa textoIa={dados?.textoIa} perfil={perfilMapped} />
+            <ResumoIa
+              textoIa={dados?.textoIa}
+              perfil={perfilMapped}
+              ranking={rankingEstado}
+              risco={dados?.risco}
+            />
           )}
         </section>
 
