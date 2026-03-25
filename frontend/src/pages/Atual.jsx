@@ -1,15 +1,10 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import HeaderAlerta from "../components/HeaderAlerta";
 import OQueFazerAgora from "../components/OQueFazerAgora";
 import KpiCards from "../components/KpiCards";
 import StatusRapido from "../components/StatusRapido";
-import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
-import RiscoFuturo from "../components/RiscoFuturo";
-import MapaEstado from "../components/MapaEstado";
-import MapaHospitais from "../components/MapaHospitais";
-import ResumoIa from "../components/ResumoIa";
 import {
   buscarMunicipio,
   buscarRankingEstado,
@@ -19,6 +14,12 @@ import {
   buscarRiscoBrasil,
   buscarRiscoEstado,
 } from "../services/api";
+
+const CurvaEpidemiologica = lazy(() => import("../components/CurvaEpidemiologica"));
+const RiscoFuturo = lazy(() => import("../components/RiscoFuturo"));
+const MapaEstado = lazy(() => import("../components/MapaEstado"));
+const MapaHospitais = lazy(() => import("../components/MapaHospitais"));
+const ResumoIa = lazy(() => import("../components/ResumoIa"));
 
 const ANO_ATUAL = new Date().getFullYear();
 
@@ -47,7 +48,7 @@ function SectionSkeleton({ linhas = 3 }) {
 function SectionErro() {
   return (
     <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 text-sm text-gray-400 text-center">
-      Dados indisponíveis
+      Dados indisponiveis
     </div>
   );
 }
@@ -64,121 +65,187 @@ function mapHospital(h) {
   };
 }
 
+function foiRequisicaoCancelada(error) {
+  return (
+    error?.name === "AbortError" ||
+    error?.name === "CanceledError" ||
+    error?.code === "ERR_CANCELED"
+  );
+}
+
 export default function Atual() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const hasUrlParams   = !!searchParams.get("municipio") || !!searchParams.get("uf");
+  const hasUrlParams = !!searchParams.get("municipio") || !!searchParams.get("uf");
   const municipioParam = searchParams.get("municipio");
-  const ufParam        = searchParams.get("uf")        || "MG";
-  const doencaParam    = searchParams.get("doenca")    || "dengue";
+  const ufParam = searchParams.get("uf") || "MG";
+  const doencaParam = searchParams.get("doenca") || "dengue";
 
-  const [dados, setDados]                = useState(null);
+  const [dados, setDados] = useState(null);
   const [rankingEstado, setRankingEstado] = useState([]);
-  const [loading, setLoading]            = useState(false);
-  const [erro, setErro]                  = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState(null);
   // "pending" = aguardando geo | "city" = carregar dados | "brasil" = estado neutro
-  const [geoState, setGeoState]          = useState(hasUrlParams ? "city" : "pending");
+  const [geoState, setGeoState] = useState(hasUrlParams ? "city" : "pending");
 
-  // Quando usuário pesquisa via TopNav enquanto estava no estado brasil
+  const requestRef = useRef({ id: 0, controller: null });
+
+  const iniciarRequisicao = () => {
+    requestRef.current.controller?.abort();
+
+    const controller = new AbortController();
+    const id = requestRef.current.id + 1;
+    requestRef.current = { id, controller };
+
+    setLoading(true);
+    setErro(null);
+    setDados(null);
+    setRankingEstado([]);
+
+    return { id, signal: controller.signal };
+  };
+
+  const ehRequisicaoAtual = (id) => requestRef.current.id === id;
+
+  const finalizarRequisicao = (id) => {
+    if (ehRequisicaoAtual(id)) {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (hasUrlParams && geoState === "brasil") {
+    return () => requestRef.current.controller?.abort();
+  }, []);
+
+  // Quando usuario pesquisa via TopNav enquanto estava no estado brasil ou pendente
+  useEffect(() => {
+    if (hasUrlParams && geoState !== "city") {
       setGeoState("city");
     }
   }, [hasUrlParams, geoState]);
 
-  // Tenta detectar a cidade real do usuário uma única vez na abertura da página
+  // Tenta detectar a cidade real do usuario uma unica vez na abertura da pagina
   useEffect(() => {
-    if (hasUrlParams) return; // já tem params → geoState já é "city"
+    if (hasUrlParams) {
+      return;
+    }
 
     if (!navigator.geolocation) {
       setGeoState("brasil");
       return;
     }
 
-    // Timeout de 5s → se geo demorar, exibe estado Brasil neutro
+    let ignorar = false;
     const timer = setTimeout(() => setGeoState("brasil"), 5000);
 
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
+        if (ignorar) {
+          return;
+        }
         clearTimeout(timer);
+
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse` +
-            `?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
           );
           const data = await res.json();
           const city =
             data.address?.city ||
             data.address?.town ||
             data.address?.municipality;
-          // ISO3166-2-lvl4 retorna "BR-MG", "BR-SP", etc.
           const uf = (data.address?.["ISO3166-2-lvl4"] || "").replace("BR-", "");
+
           if (city && uf) {
             setSearchParams({ municipio: city, uf, doenca: "dengue" }, { replace: true });
             setGeoState("city");
           } else {
-            setGeoState("brasil"); // coords válidas mas sem cidade reconhecida
+            setGeoState("brasil");
           }
         } catch {
-          setGeoState("brasil"); // Nominatim falhou
+          setGeoState("brasil");
         }
       },
       () => {
-        // Permissão negada ou erro de hardware → estado neutro Brasil
+        if (ignorar) {
+          return;
+        }
         clearTimeout(timer);
         setGeoState("brasil");
       },
       { timeout: 4500, maximumAge: 60_000 }
     );
 
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      ignorar = true;
+      clearTimeout(timer);
+    };
+  }, [hasUrlParams, setSearchParams]);
 
-  // Carrega dados somente quando geoState === "city" ou geoState === "brasil"
   useEffect(() => {
     if (geoState === "city") {
       if (municipioParam) {
-        carregar(municipioParam, ufParam, doencaParam);
-      } else if (ufParam === "BR") {
+        carregarMunicipio(municipioParam, ufParam, doencaParam);
+        return;
+      }
+      if (ufParam === "BR") {
         carregarBrasil(doencaParam);
-      } else if (ufParam) {
+        return;
+      }
+      if (ufParam) {
         carregarEstado(ufParam, doencaParam);
       }
-    } else if (geoState === "brasil" && !hasUrlParams) {
+      return;
+    }
+
+    if (geoState === "brasil" && !hasUrlParams) {
       carregarBrasil(doencaParam);
     }
   }, [municipioParam, ufParam, doencaParam, geoState, hasUrlParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const carregar = async (municipio, uf, doenca) => {
-    setLoading(true);
-    setErro(null);
+  const carregarMunicipio = async (municipio, uf, doenca) => {
+    const { id, signal } = iniciarRequisicao();
+
     try {
-      const resp = await buscarMunicipio(municipio, uf, doenca, ANO_ATUAL);
-      setDados(resp);
+      const resp = await buscarMunicipio(municipio, uf, doenca, ANO_ATUAL, signal);
+      if (!ehRequisicaoAtual(id)) {
+        return;
+      }
+
       const ufFinal = resp?.perfil?.uf || uf;
-      const ranking = await buscarRankingEstado(ufFinal, ANO_ATUAL);
+      const ranking = await buscarRankingEstado(ufFinal, ANO_ATUAL, doenca, signal);
+      if (!ehRequisicaoAtual(id)) {
+        return;
+      }
+
+      setDados(resp);
       setRankingEstado(ranking?.ranking || []);
-    } catch {
-      setErro("Município não encontrado. Verifique o nome e o estado.");
+    } catch (error) {
+      if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
+        setErro("Municipio nao encontrado. Verifique o nome e o estado.");
+      }
     } finally {
-      setLoading(false);
+      finalizarRequisicao(id);
     }
   };
 
   const carregarBrasil = async (doenca) => {
-    setLoading(true);
-    setErro(null);
+    const { id, signal } = iniciarRequisicao();
+
     try {
-      if (!searchParams.get("uf") || searchParams.get("uf") !== "BR") {
+      if (searchParams.get("uf") !== "BR") {
         setSearchParams({ uf: "BR", doenca }, { replace: true });
       }
 
       const [resp, riscoAg, hospitaisBrasil] = await Promise.all([
-        buscarBrasil(doenca, ANO_ATUAL),
-        buscarRiscoBrasil(),
-        buscarHospitaisBrasilAgregado(),
+        buscarBrasil(doenca, ANO_ATUAL, signal),
+        buscarRiscoBrasil(signal),
+        buscarHospitaisBrasilAgregado(signal),
       ]);
-      
+      if (!ehRequisicaoAtual(id)) {
+        return;
+      }
+
       setDados({
         perfil: {
           municipio: "Brasil",
@@ -189,7 +256,7 @@ export default function Atual() {
           tendencia: resp.tendencia,
           semanas: resp.semanas,
           semanasAnoAnterior: resp.semanasAnoAnterior,
-          doenca: doenca,
+          doenca,
           ano: ANO_ATUAL,
         },
         textoIa: resp.textoIa,
@@ -199,72 +266,72 @@ export default function Atual() {
         municipiosPiores: resp.municipiosPiores,
       });
       setRankingEstado(resp.estadosPiores || []);
-    } catch (e) {
-      console.error("Erro ao carregar dados do Brasil:", e);
-      setErro("Erro ao carregar dados do Brasil");
+    } catch (error) {
+      if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
+        setErro("Erro ao carregar dados do Brasil.");
+      }
     } finally {
-      setLoading(false);
+      finalizarRequisicao(id);
     }
   };
 
   const carregarEstado = async (uf, doenca) => {
-    setLoading(true);
-    setErro(null);
+    const { id, signal } = iniciarRequisicao();
+
     try {
       const [ranking, hospitais, riscoAg] = await Promise.all([
-        buscarRankingEstado(uf, ANO_ATUAL),
-        buscarHospitaisEstadoRegiao(uf),
-        buscarRiscoEstado(uf),
+        buscarRankingEstado(uf, ANO_ATUAL, doenca, signal),
+        buscarHospitaisEstadoRegiao(uf, signal),
+        buscarRiscoEstado(uf, signal),
       ]);
-      
-      // Calcula agregado do estado a partir do ranking
-      const totalCasos = ranking?.ranking?.reduce((sum, m) => sum + (m.totalCasos || 0), 0) || 0;
-      const populacao = ranking?.ranking?.reduce((sum, m) => sum + (m.populacao || 0), 0) || 1;
+      if (!ehRequisicaoAtual(id)) {
+        return;
+      }
+
+      const totalCasos = ranking?.ranking?.reduce((sum, item) => sum + (item.totalCasos || 0), 0) || 0;
+      const populacao = ranking?.ranking?.reduce((sum, item) => sum + (item.populacao || 0), 0) || 1;
       const incidencia = populacao > 0 ? (totalCasos / populacao) * 100_000 : 0;
-      
-      const obterClassificacao = (incid) => {
-        if (incid < 50) return "BAIXO";
-        if (incid < 100) return "MODERADO";
-        if (incid <= 300) return "ALTO";
+
+      const classificar = (valorIncidencia) => {
+        if (valorIncidencia < 50) return "BAIXO";
+        if (valorIncidencia < 100) return "MODERADO";
+        if (valorIncidencia <= 300) return "ALTO";
         return "EPIDEMIA";
       };
-      
+
       setDados({
         perfil: {
           municipio: uf,
-          uf: uf,
+          uf,
           total: totalCasos,
-          incidencia: incidencia,
-          classificacao: obterClassificacao(incidencia),
+          incidencia,
+          classificacao: classificar(incidencia),
           tendencia: "ESTAVEL",
           semanas: [],
           semanasAnoAnterior: [],
-          doenca: doenca,
+          doenca,
           ano: ANO_ATUAL,
         },
-        textoIa: `Estado ${uf} registrou ${totalCasos} casos de ${doenca} em ${ANO_ATUAL}, com incidência de ${incidencia.toFixed(1)} por 100 mil habitantes.`,
+        textoIa: `Estado ${uf} registrou ${totalCasos} casos de ${doenca} em ${ANO_ATUAL}, com incidencia de ${incidencia.toFixed(1)} por 100 mil habitantes.`,
         risco: riscoAg,
         encaminhamento: { hospitais: (hospitais || []).map(mapHospital) },
       });
       setRankingEstado(ranking?.ranking || []);
-    } catch (e) {
-      console.error("Erro ao carregar dados do estado:", e);
-      setErro("Estado não encontrado. Verifique.");
+    } catch (error) {
+      if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
+        setErro("Estado nao encontrado. Verifique.");
+      }
     } finally {
-      setLoading(false);
+      finalizarRequisicao(id);
     }
-  };
-
-  const onBuscar = (municipio, uf, doenca) => {
-    setSearchParams({ municipio, uf, doenca });
   };
 
   const perfil = dados?.perfil || {};
 
   const hoje = new Date();
   const em14dias = new Date(hoje.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const formatarData = (d) =>
-    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  const formatarData = (data) =>
+    data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 
   const perfilMapped = dados
     ? { ...perfil, totalCasos: perfil.total, incidencia100k: perfil.incidencia }
@@ -277,69 +344,55 @@ export default function Atual() {
       }
     : null;
 
-  // Estado: aguardando geolocalização
+  const renderizarSkeletonOuErro = (linhas = 3) => {
+    if (loading || !dados) {
+      return <SectionSkeleton linhas={linhas} />;
+    }
+    if (erro) {
+      return <SectionErro />;
+    }
+    return null;
+  };
+
   if (geoState === "pending") {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <TopNav />
+      <div className="min-h-screen vigi-page">
+        <TopNav loading />
         <div className="flex flex-col items-center justify-center h-80 gap-3">
           <p className="text-gray-400 text-sm animate-pulse">
-            🔍 Detectando sua localização...
+            Detectando sua localizacao...
           </p>
-          <p className="text-xs text-gray-300">
-            Ou pesquise um município acima
+          <p className="text-xs text-gray-300">Voce tambem pode pesquisar acima.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (geoState === "brasil" && loading) {
+    return (
+      <div className="min-h-screen vigi-page">
+        <TopNav loading />
+        <div className="flex flex-col items-center justify-center h-[70vh] gap-5">
+          <p className="text-gray-400 text-sm animate-pulse">
+            Carregando dados do Brasil...
           </p>
         </div>
       </div>
     );
   }
 
-  // Estado: localização negada / indisponível → carrega dados agregados do Brasil
-  if (geoState === "brasil") {
-    if (loading) {
-      return (
-        <div className="min-h-screen bg-gray-50">
-          <TopNav />
-          <div className="flex flex-col items-center justify-center h-[70vh] gap-5">
-            <p className="text-gray-400 text-sm animate-pulse">
-              🔍 Carregando dados do Brasil...
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (erro) {
-      return (
-        <div className="min-h-screen bg-gray-50">
-          <TopNav />
-          <div className="flex flex-col items-center justify-center h-[70vh] gap-5 text-center px-6">
-            <div className="text-6xl">🇧🇷</div>
-            <h2 className="text-xl font-bold text-gray-700">
-              Dados Indisponíveis
-            </h2>
-            <p className="text-sm text-gray-500 max-w-sm">
-              {erro}
-            </p>
-          </div>
-        </div>
-      );
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <TopNav />
+    <div className="min-h-screen vigi-page">
+      <TopNav loading={loading} />
+
       {erro && (
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4
-                          text-sm text-red-600">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">
             {erro}
           </div>
         </div>
       )}
 
-      {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center justify-between">
         <p className="text-xs text-gray-400">
           {perfil?.municipio
@@ -347,121 +400,141 @@ export default function Atual() {
             : "Carregando..."}
         </p>
         <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">
-          📡 Atual & Previsão
+          Atual e Previsao
         </span>
       </div>
 
-      {/* 1. Cabeçalho com alerta */}
-      {loading ? (
-        <div className="px-6 py-5 bg-gray-200 animate-pulse">
-          <div className="max-w-6xl mx-auto h-16 bg-gray-300 rounded" />
-        </div>
-      ) : erro ? (
-        <div className="px-6 py-5">
-          <SectionErro />
-        </div>
-      ) : (
-        <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />
-      )}
+      {(() => {
+        const fallback = renderizarSkeletonOuErro(2);
+        if (fallback) {
+          return <div className="px-6 py-5">{fallback}</div>;
+        }
+        return <HeaderAlerta perfil={perfilMapped} risco={dados?.risco} />;
+      })()}
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
+        {(() => {
+          const fallback = renderizarSkeletonOuErro(5);
+          if (fallback) {
+            return fallback;
+          }
+          return (
+            <OQueFazerAgora
+              perfil={perfilMapped}
+              textoIa={dados?.textoIa}
+              ranking={rankingEstado}
+              risco={dados?.risco}
+            />
+          );
+        })()}
 
-        {/* 2. O que fazer agora — tomada de decisão com IA */}
-        <OQueFazerAgora
-          perfil={perfilMapped}
-          textoIa={dados?.textoIa}
-          ranking={rankingEstado}
-          risco={dados?.risco}
-        />
+        {(() => {
+          const fallback = renderizarSkeletonOuErro(2);
+          if (fallback) {
+            return fallback;
+          }
+          return <StatusRapido perfil={perfilMapped} risco={dados?.risco} />;
+        })()}
 
-        {/* 3. Status rápido — 3 métricas compactas */}
-        <StatusRapido perfil={perfilMapped} risco={dados?.risco} />
-        {/* 3. KPIs */}
-        {loading ? (
-          <SectionSkeleton linhas={2} />
-        ) : erro ? (
-          <SectionErro />
-        ) : (
-          <KpiCards perfil={perfilMapped} risco={dados?.risco} />
-        )}
+        {(() => {
+          const fallback = renderizarSkeletonOuErro(2);
+          if (fallback) {
+            return fallback;
+          }
+          return <KpiCards perfil={perfilMapped} risco={dados?.risco} />;
+        })()}
 
-        {/* 4. Curva epidemiológica */}
         <section>
-          <SectionTitle icone="📈" titulo="Evolução dos casos" />
-          {loading ? (
-            <SectionSkeleton linhas={5} />
-          ) : erro ? (
-            <SectionErro />
-          ) : (
-            <CurvaEpidemiologica perfil={perfil} />
-          )}
+          <SectionTitle icone="Curva" titulo="Evolucao dos casos" />
+          {(() => {
+            const fallback = renderizarSkeletonOuErro(5);
+            if (fallback) {
+              return fallback;
+            }
+            return (
+              <Suspense fallback={<SectionSkeleton linhas={5} />}>
+                <CurvaEpidemiologica perfil={perfil} />
+              </Suspense>
+            );
+          })()}
         </section>
 
-        {/* 5. Risco futuro (14 dias) */}
         <section>
           <SectionTitle
-            icone="🌡️"
-            titulo={`Risco climático — ${formatarData(hoje)} a ${formatarData(em14dias)}`}
+            icone="Clima"
+            titulo={`Risco climatico - ${formatarData(hoje)} a ${formatarData(em14dias)}`}
           />
-          {loading ? (
-            <SectionSkeleton linhas={2} />
-          ) : erro ? (
-            <SectionErro />
-          ) : (
-            <RiscoFuturo risco={dados?.risco} />
-          )}
+          {(() => {
+            const fallback = renderizarSkeletonOuErro(3);
+            if (fallback) {
+              return fallback;
+            }
+            return (
+              <Suspense fallback={<SectionSkeleton linhas={3} />}>
+                <RiscoFuturo risco={dados?.risco} />
+              </Suspense>
+            );
+          })()}
         </section>
 
-        {/* 6. Distribuição regional */}
         <section>
-          <SectionTitle icone="🗺️" titulo="Distribuição regional" />
-          {loading ? (
-            <SectionSkeleton linhas={4} />
-          ) : erro ? (
-            <SectionErro />
-          ) : (
-            <MapaEstado
-              uf={perfil?.uf}
-              nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
-              coIbgeDestaque={perfil?.coIbge}
-              ranking={rankingEstado}
-              risco={dados?.risco}
-            />
-          )}
+          <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
+          {(() => {
+            const fallback = renderizarSkeletonOuErro(4);
+            if (fallback) {
+              return fallback;
+            }
+            return (
+              <Suspense fallback={<SectionSkeleton linhas={4} />}>
+                <MapaEstado
+                  uf={perfil?.uf}
+                  nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
+                  coIbgeDestaque={perfil?.coIbge}
+                  ranking={rankingEstado}
+                  risco={dados?.risco}
+                />
+              </Suspense>
+            );
+          })()}
         </section>
 
-        {/* 7. Infraestrutura / encaminhamento */}
         <section>
-          <SectionTitle icone="🏥" titulo="Infraestrutura disponível" />
-          {loading ? (
-            <SectionSkeleton linhas={3} />
-          ) : erro ? (
-            <SectionErro />
-          ) : (
-            <MapaHospitais
-              perfil={perfilMapped}
-              encaminhamento={encaminhamentoMapped}
-            />
-          )}
+          <SectionTitle icone="Hospitais" titulo="Infraestrutura disponivel" />
+          {(() => {
+            const fallback = renderizarSkeletonOuErro(3);
+            if (fallback) {
+              return fallback;
+            }
+            return (
+              <Suspense fallback={<SectionSkeleton linhas={3} />}>
+                <MapaHospitais
+                  perfil={perfilMapped}
+                  encaminhamento={encaminhamentoMapped}
+                />
+              </Suspense>
+            );
+          })()}
         </section>
 
-        {/* 8. Resumo IA */}
         <section>
-          <SectionTitle icone="📋" titulo="Resumo operacional" />
-          {loading ? (
-            <SectionSkeleton linhas={4} />
-          ) : erro ? (
-            <SectionErro />
-          ) : (
-            <ResumoIa
-              textoIa={dados?.textoIa}
-              perfil={perfilMapped}
-              ranking={rankingEstado}
-              risco={dados?.risco}
-            />
-          )}
+          <SectionTitle icone="Resumo" titulo="Resumo operacional" />
+          {(() => {
+            const fallback = renderizarSkeletonOuErro(4);
+            if (fallback) {
+              return fallback;
+            }
+            return (
+              <Suspense fallback={<SectionSkeleton linhas={4} />}>
+                <ResumoIa
+                  textoIa={dados?.textoIa}
+                  perfil={perfilMapped}
+                  ranking={rankingEstado}
+                  risco={dados?.risco}
+                />
+              </Suspense>
+            );
+          })()}
         </section>
-
       </div>
     </div>
   );

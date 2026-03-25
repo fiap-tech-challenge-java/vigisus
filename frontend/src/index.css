@@ -1,3 +1,60 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --vigi-bg: #f8fafc;
+  --vigi-surface: #ffffff;
+  --vigi-border: #e5e7eb;
+  --vigi-brand: #dc2626;
+  --vigi-brand-hover: #b91c1c;
+  --vigi-info: #2563eb;
+}
+
+.vigi-page {
+  background-color: var(--vigi-bg);
+  color: #111827;
+}
+
+.vigi-card {
+  background-color: var(--vigi-surface);
+  border: 1px solid var(--vigi-border);
+  border-radius: 0.75rem;
+}
+
+.vigi-button-primary {
+  background-color: var(--vigi-brand);
+  color: #ffffff;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.vigi-button-primary:hover {
+  background-color: var(--vigi-brand-hover);
+}
+
+.vigi-button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vigisus-marker {
+  background: transparent;
+  border: none;
+}
+
+.vigisus-marker span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.vigisus-marker--origem span {
+  background: #2563eb;
+}
+
+.vigisus-marker--hospital span {
+  background: #dc2626;
+}

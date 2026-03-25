@@ -1,17 +1,28 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Atual     from "./pages/Atual";
-import Historico from "./pages/Historico";
-// import Home from "./pages/Home"; // COMENTADO — não deletar
+import { Suspense, lazy } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+const Atual = lazy(() => import("./pages/Atual"));
+const Historico = lazy(() => import("./pages/Historico"));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen vigi-page flex items-center justify-center">
+      <p className="text-sm text-gray-400 animate-pulse">Carregando aplicacao...</p>
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/"          element={<Navigate to="/atual" replace />} />
-        <Route path="/atual"     element={<Atual />} />
-        <Route path="/historico" element={<Historico />} />
-        <Route path="*"          element={<Navigate to="/atual" replace />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/atual" replace />} />
+          <Route path="/atual" element={<Atual />} />
+          <Route path="/historico" element={<Historico />} />
+          <Route path="*" element={<Navigate to="/atual" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -1,13 +1,8 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import TopNav from "../components/TopNav";
 import KpiCards from "../components/KpiCards";
 import KpisHistorico from "../components/KpisHistorico";
-import ComparacaoAnual from "../components/ComparacaoAnual";
-import CurvaEpidemiologica from "../components/CurvaEpidemiologica";
-import MapaEstado from "../components/MapaEstado";
-import TabelaRanking from "../components/TabelaRanking";
-import IAHistorico from "../components/IAHistorico";
 import {
   buscarMunicipio,
   buscarRankingEstado,
@@ -16,6 +11,12 @@ import {
 } from "../services/api";
 import { gerarTextoNarrativoPadrao } from "../utils/iaInsights";
 
+const ComparacaoAnual = lazy(() => import("../components/ComparacaoAnual"));
+const CurvaEpidemiologica = lazy(() => import("../components/CurvaEpidemiologica"));
+const MapaEstado = lazy(() => import("../components/MapaEstado"));
+const TabelaRanking = lazy(() => import("../components/TabelaRanking"));
+const IAHistorico = lazy(() => import("../components/IAHistorico"));
+
 function SectionTitle({ icone, titulo }) {
   return (
     <div className="flex items-center gap-3 mb-4 border-l-4 border-blue-300 pl-3">
@@ -23,6 +24,28 @@ function SectionTitle({ icone, titulo }) {
         {icone} {titulo}
       </p>
     </div>
+  );
+}
+
+function SectionSkeleton({ linhas = 3 }) {
+  return (
+    <div className="bg-white rounded-xl p-4 animate-pulse space-y-3">
+      {Array.from({ length: linhas }).map((_, i) => (
+        <div
+          key={i}
+          className="h-4 bg-gray-200 rounded"
+          style={{ width: `${70 + (i % 3) * 10}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function foiRequisicaoCancelada(error) {
+  return (
+    error?.name === "AbortError" ||
+    error?.name === "CanceledError" ||
+    error?.code === "ERR_CANCELED"
   );
 }
 
@@ -40,6 +63,36 @@ export default function Historico() {
   const [dados, setDados] = useState(null);
   const [rankingEstado, setRankingEstado] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState(null);
+
+  const requestRef = useRef({ id: 0, controller: null });
+
+  const iniciarRequisicao = () => {
+    requestRef.current.controller?.abort();
+
+    const controller = new AbortController();
+    const id = requestRef.current.id + 1;
+    requestRef.current = { id, controller };
+
+    setLoading(true);
+    setErro(null);
+    setDados(null);
+    setRankingEstado([]);
+
+    return { id, signal: controller.signal };
+  };
+
+  const ehRequisicaoAtual = (id) => requestRef.current.id === id;
+
+  const finalizarRequisicao = (id) => {
+    if (ehRequisicaoAtual(id)) {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => requestRef.current.controller?.abort();
+  }, []);
 
   useEffect(() => {
     if (!searchParams.get("ano")) {
@@ -54,18 +107,31 @@ export default function Historico() {
   }, [municipioParam, ufParam, doencaParam, anoParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const carregar = async (municipio, uf, doenca, ano) => {
-    setLoading(true);
+    const { id, signal } = iniciarRequisicao();
+
     try {
       if (municipio) {
-        const resp = await buscarMunicipio(municipio, uf, doenca, ano);
+        const resp = await buscarMunicipio(municipio, uf, doenca, ano, signal);
+        if (!ehRequisicaoAtual(id)) {
+          return;
+        }
+
+        const ranking = await buscarRankingEstado(resp?.perfil?.uf || uf, ano, doenca, signal);
+        if (!ehRequisicaoAtual(id)) {
+          return;
+        }
+
         setDados(resp);
-        const ranking = await buscarRankingEstado(resp?.perfil?.uf || uf, ano, doenca);
         setRankingEstado(ranking?.ranking || []);
         return;
       }
 
       if ((uf || "").toUpperCase() === "BR") {
-        const resp = await buscarBrasil(doenca, ano);
+        const resp = await buscarBrasil(doenca, ano, signal);
+        if (!ehRequisicaoAtual(id)) {
+          return;
+        }
+
         const perfilBrasil = {
           coIbge: "00",
           municipio: "Brasil",
@@ -82,23 +148,28 @@ export default function Historico() {
 
         setDados({
           perfil: perfilBrasil,
-          textoIa: resp?.textoIa || gerarTextoNarrativoPadrao({
-            perfil: {
-              ...perfilBrasil,
-              totalCasos: perfilBrasil.total,
-              incidencia100k: perfilBrasil.incidencia,
-            },
-            ranking: resp?.estadosPiores || [],
-          }),
+          textoIa:
+            resp?.textoIa ||
+            gerarTextoNarrativoPadrao({
+              perfil: {
+                ...perfilBrasil,
+                totalCasos: perfilBrasil.total,
+                incidencia100k: perfilBrasil.incidencia,
+              },
+              ranking: resp?.estadosPiores || [],
+            }),
         });
         setRankingEstado(resp?.estadosPiores || []);
         return;
       }
 
       const [ranking, perfilEstado] = await Promise.all([
-        buscarRankingEstado(uf, ano, doenca),
-        buscarHistoricoEstado(uf, ano, doenca),
+        buscarRankingEstado(uf, ano, doenca, signal),
+        buscarHistoricoEstado(uf, ano, doenca, signal),
       ]);
+      if (!ehRequisicaoAtual(id)) {
+        return;
+      }
 
       const lista = ranking?.ranking || [];
       const perfilLocal = {
@@ -128,23 +199,27 @@ export default function Historico() {
       });
       setRankingEstado(lista);
     } catch (error) {
-      console.error(error);
+      if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
+        setErro("Nao foi possivel carregar os dados historicos.");
+      }
     } finally {
-      setLoading(false);
+      finalizarRequisicao(id);
     }
   };
 
   if (anoParam >= ANO_ATUAL) {
     const params = new URLSearchParams({ uf: ufParam, doenca: doencaParam });
-    if (municipioParam) params.append("municipio", municipioParam);
+    if (municipioParam) {
+      params.append("municipio", municipioParam);
+    }
     return <Navigate to={`/atual?${params}`} replace />;
   }
 
   if (loading) {
     return (
       <>
-        <TopNav />
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <TopNav loading />
+        <div className="min-h-screen vigi-page flex items-center justify-center">
           <p className="text-gray-400 text-sm animate-pulse">
             Carregando dados historicos...
           </p>
@@ -153,7 +228,22 @@ export default function Historico() {
     );
   }
 
-  if (!dados) return null;
+  if (erro) {
+    return (
+      <div className="min-h-screen vigi-page">
+        <TopNav />
+        <div className="max-w-4xl mx-auto px-6 py-10">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">
+            {erro}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dados) {
+    return null;
+  }
 
   const perfil = dados.perfil || {};
   const perfilMapped = {
@@ -163,8 +253,8 @@ export default function Historico() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <TopNav />
+    <div className="min-h-screen vigi-page">
+      <TopNav loading={loading} />
 
       <div className="bg-slate-700 text-white px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -192,48 +282,58 @@ export default function Historico() {
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
         <section>
           <SectionTitle icone="IA" titulo="Analise de IA - periodo historico" />
-          <IAHistorico
-            textoIa={dados?.textoIa}
-            ano={perfil?.ano || anoParam}
-            perfil={perfilMapped}
-            ranking={rankingEstado}
-          />
+          <Suspense fallback={<SectionSkeleton linhas={4} />}>
+            <IAHistorico
+              textoIa={dados?.textoIa}
+              ano={perfil?.ano || anoParam}
+              perfil={perfilMapped}
+              ranking={rankingEstado}
+            />
+          </Suspense>
         </section>
 
         <KpisHistorico perfil={perfilMapped} />
-        <KpiCards perfil={perfilMapped} modoHistorico={true} />
+        <KpiCards perfil={perfilMapped} modoHistorico />
 
         <section>
           <SectionTitle icone="Dados" titulo="Resumo anual selecionado" />
-          <ComparacaoAnual
-            coIbge={perfil?.coIbge}
-            uf={perfil?.uf}
-            doenca={perfil?.doenca || doencaParam}
-            escopo={municipioParam ? "municipio" : ((perfil?.uf || ufParam) === "BR" ? "brasil" : "estado")}
-            anoBase={Number(perfil?.ano || anoParam)}
-            totalAnoSelecionado={perfil?.total}
-          />
+          <Suspense fallback={<SectionSkeleton linhas={4} />}>
+            <ComparacaoAnual
+              coIbge={perfil?.coIbge}
+              uf={perfil?.uf}
+              doenca={perfil?.doenca || doencaParam}
+              escopo={municipioParam ? "municipio" : ((perfil?.uf || ufParam) === "BR" ? "brasil" : "estado")}
+              anoBase={Number(perfil?.ano || anoParam)}
+              totalAnoSelecionado={perfil?.total}
+            />
+          </Suspense>
         </section>
 
         <section>
           <SectionTitle icone="Curva" titulo="Evolucao dos casos" />
-          <CurvaEpidemiologica perfil={perfil} />
+          <Suspense fallback={<SectionSkeleton linhas={5} />}>
+            <CurvaEpidemiologica perfil={perfil} />
+          </Suspense>
         </section>
 
         <section>
           <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
-          <MapaEstado
-            uf={perfil?.uf}
-            nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
-            coIbgeDestaque={perfil?.coIbge}
-            ranking={rankingEstado}
-          />
+          <Suspense fallback={<SectionSkeleton linhas={4} />}>
+            <MapaEstado
+              uf={perfil?.uf}
+              nivel={perfil?.uf === "BR" ? "brasil" : "estado"}
+              coIbgeDestaque={perfil?.coIbge}
+              ranking={rankingEstado}
+            />
+          </Suspense>
         </section>
 
         {rankingEstado?.length > 0 && (
           <section>
             <SectionTitle icone="Ranking" titulo="Ranking territorial" />
-            <TabelaRanking ranking={rankingEstado} />
+            <Suspense fallback={<SectionSkeleton linhas={6} />}>
+              <TabelaRanking ranking={rankingEstado} />
+            </Suspense>
           </section>
         )}
       </div>

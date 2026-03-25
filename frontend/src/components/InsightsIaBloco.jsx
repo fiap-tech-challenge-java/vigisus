@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { gerarInsightsIA } from "../utils/iaInsights";
 
 export default function InsightsIaBloco({
@@ -8,7 +9,10 @@ export default function InsightsIaBloco({
   cor = "slate",
   foco = "geral",
 }) {
-  const analise = gerarInsightsIA({ perfil, ranking, risco, textoIa });
+  const analise = useMemo(
+    () => gerarInsightsIA({ perfil, ranking, risco, textoIa }),
+    [perfil, ranking, risco, textoIa]
+  );
 
   const cores = {
     blue: {

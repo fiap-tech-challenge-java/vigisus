@@ -1,9 +1,8 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix default icon paths broken by webpack
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -15,57 +14,63 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Ícones customizados
-const ICONE_ORIGEM = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
-  shadowUrl: markerShadow,
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-const ICONE_HOSPITAL = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-  shadowUrl: markerShadow,
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+const ICONE_ORIGEM = L.divIcon({
+  className: "vigisus-marker vigisus-marker--origem",
+  html: "<span></span>",
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+  popupAnchor: [0, -8],
 });
 
-// Ajusta zoom para mostrar todos os marcadores
+const ICONE_HOSPITAL = L.divIcon({
+  className: "vigisus-marker vigisus-marker--hospital",
+  html: "<span></span>",
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+  popupAnchor: [0, -8],
+});
+
 function FitBounds({ coords }) {
   const map = useMap();
+
   useEffect(() => {
     if (coords.length > 1) {
       map.fitBounds(coords, { padding: [40, 40] });
     }
   }, [coords, map]);
+
   return null;
 }
 
-// Default coordinates for Brasília/DF when municipality lat/lon is unavailable
 const DEFAULT_LAT = -15.78;
 const DEFAULT_LON = -47.93;
 
 export default function MapaHospitais({ perfil, encaminhamento }) {
-  const hospitais = encaminhamento?.hospitais || [];
-
-  const latOrigem = perfil?.nuLatitude  || DEFAULT_LAT;
+  const hospitais = useMemo(() => encaminhamento?.hospitais || [], [encaminhamento]);
+  const latOrigem = perfil?.nuLatitude || DEFAULT_LAT;
   const lonOrigem = perfil?.nuLongitude || DEFAULT_LON;
 
-  const coords = [
-    [latOrigem, lonOrigem],
-    ...hospitais
-      .filter(h => h.nuLatitude && h.nuLongitude)
-      .map(h => [h.nuLatitude, h.nuLongitude])
-  ];
+  const hospitaisComCoordenadas = useMemo(
+    () => hospitais.filter((hospital) => hospital.nuLatitude && hospital.nuLongitude),
+    [hospitais]
+  );
+
+  const coords = useMemo(
+    () => [
+      [latOrigem, lonOrigem],
+      ...hospitaisComCoordenadas.map((hospital) => [hospital.nuLatitude, hospital.nuLongitude]),
+    ],
+    [latOrigem, lonOrigem, hospitaisComCoordenadas]
+  );
 
   return (
     <div className="mx-6 max-w-6xl md:mx-auto mt-4">
       <div className="flex flex-col md:flex-row gap-4">
-
-        {/* MAPA */}
         <div className="flex-1 rounded-xl overflow-hidden shadow" style={{ height: 380 }}>
           <MapContainer
             center={[latOrigem, lonOrigem]}
             zoom={8}
+            preferCanvas
             style={{ height: "100%", width: "100%" }}
           >
             <TileLayer
@@ -74,68 +79,84 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
             />
             <FitBounds coords={coords} />
 
-            {/* Marcador do município */}
             <Marker position={[latOrigem, lonOrigem]} icon={ICONE_ORIGEM}>
               <Popup>
-                <strong>{perfil?.municipio}</strong><br/>
-                Município buscado
+                <strong>{perfil?.municipio}</strong>
+                <br />
+                Municipio buscado
               </Popup>
             </Marker>
 
-            {/* Marcadores dos hospitais */}
-            {hospitais.filter(h => h.nuLatitude && h.nuLongitude).map((h, i) => (
+            {hospitaisComCoordenadas.map((hospital, index) => (
               <Marker
-                key={i}
-                position={[h.nuLatitude, h.nuLongitude]}
+                key={`${hospital.nome || "hospital"}-${hospital.nuLatitude}-${hospital.nuLongitude}-${index}`}
+                position={[hospital.nuLatitude, hospital.nuLongitude]}
                 icon={ICONE_HOSPITAL}
               >
                 <Popup>
-                  <strong>{h.nome}</strong><br/>
-                  {typeof h.distanciaKm === "number" && <>📏 {h.distanciaKm.toFixed(1)} km<br/></>}
-                  {h.leitosSus != null && <>🛏️ {h.leitosSus} leitos SUS<br/></>}
-                  {h.servicoInfectologia && "🦠 Infectologia ✅"}<br/>
-                  {h.telefone ? `📞 ${h.telefone}` : "📞 Não informado"}
+                  <strong>{hospital.nome}</strong>
+                  <br />
+                  {typeof hospital.distanciaKm === "number" && (
+                    <>
+                      Distancia: {hospital.distanciaKm.toFixed(1)} km
+                      <br />
+                    </>
+                  )}
+                  {hospital.leitosSus != null && (
+                    <>
+                      Leitos SUS: {hospital.leitosSus}
+                      <br />
+                    </>
+                  )}
+                  {hospital.servicoInfectologia && (
+                    <>
+                      Infectologia: sim
+                      <br />
+                    </>
+                  )}
+                  {hospital.telefone ? `Telefone: ${hospital.telefone}` : "Telefone nao informado"}
                 </Popup>
               </Marker>
             ))}
           </MapContainer>
         </div>
 
-        {/* LISTA LATERAL */}
         <div className="w-full md:w-80 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: 380 }}>
           {hospitais.length === 0 ? (
             <div className="bg-white rounded-xl shadow p-4 text-sm text-gray-400 text-center">
-              Nenhum hospital encontrado para esta região
+              Nenhum hospital encontrado para esta regiao
             </div>
           ) : (
-            hospitais.map((h, i) => (
+            hospitais.map((hospital, index) => (
               <div
-                key={i}
+                key={`${hospital.nome || "hospital-card"}-${hospital.nuLatitude}-${hospital.nuLongitude}-${index}`}
                 className={`bg-white rounded-xl shadow p-4 border-l-4 ${
-                  i === 0 ? "border-red-500" : "border-gray-200"
+                  index === 0 ? "border-red-500" : "border-gray-200"
                 }`}
               >
                 <div className="flex items-start justify-between mb-1">
                   <p className="text-sm font-semibold text-gray-800 leading-tight">
-                    {i + 1}. {h.nome}
+                    {index + 1}. {hospital.nome}
                   </p>
-                  {i === 0 && (
+                  {index === 0 && (
                     <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full ml-2 shrink-0">
-                      Mais próximo
+                      Mais proximo
                     </span>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                  {typeof h.distanciaKm === "number" && <span>📏 {h.distanciaKm.toFixed(1)} km</span>}
-                  {h.leitosSus != null && <span>🛏️ {h.leitosSus} leitos SUS</span>}
-                  {h.servicoInfectologia && <span>🦠 Infectologia</span>}
+                  {typeof hospital.distanciaKm === "number" && (
+                    <span>Distancia: {hospital.distanciaKm.toFixed(1)} km</span>
+                  )}
+                  {hospital.leitosSus != null && <span>Leitos SUS: {hospital.leitosSus}</span>}
+                  {hospital.servicoInfectologia && <span>Infectologia</span>}
                 </div>
-                {h.telefone && (
+                {hospital.telefone && (
                   <a
-                    href={`tel:${h.telefone}`}
+                    href={`tel:${hospital.telefone}`}
                     className="mt-2 inline-block text-xs text-blue-600 hover:underline"
                   >
-                    📞 {h.telefone}
+                    Telefone: {hospital.telefone}
                   </a>
                 )}
               </div>
