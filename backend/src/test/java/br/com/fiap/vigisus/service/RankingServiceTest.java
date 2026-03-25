@@ -1,8 +1,8 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.domain.epidemiologia.ClassificacaoEpidemiologicaPolicy;
 import br.com.fiap.vigisus.dto.RankingResponse;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
-import br.com.fiap.vigisus.repository.MunicipioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,10 +21,7 @@ import static org.mockito.Mockito.when;
 class RankingServiceTest {
 
     @Mock
-    private MunicipioRepository municipioRepository;
-
-    @Mock
-    private CasoDengueRepository casoDengueRepository;
+    private CasoDenguePort casoDenguePort;
 
     private RankingService service;
 
@@ -33,7 +30,7 @@ class RankingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RankingService(municipioRepository, casoDengueRepository);
+        service = new RankingService(casoDenguePort, new ClassificacaoEpidemiologicaPolicy());
     }
 
     private static List<Object[]> rankingRows(Object[]... rows) {
@@ -42,7 +39,7 @@ class RankingServiceTest {
 
     @Test
     void calcularRanking_piores_ordenaDescendente() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
                 new Object[]{"31001", "Alfa", UF, 100L, 100_000L},
                 new Object[]{"31002", "Beta", UF, 300L, 100_000L},
                 new Object[]{"31003", "Gama", UF, 200L, 100_000L}
@@ -61,20 +58,22 @@ class RankingServiceTest {
 
     @Test
     void calcularRanking_melhores_ordenaAscendente() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
-                new Object[]{"31001", "Alfa", UF, 100L, 100_000L},
-                new Object[]{"31002", "Beta", UF, 300L, 100_000L}
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
+                new Object[]{"31001", "Alfa", UF, 50L, 100_000L},
+                new Object[]{"31002", "Beta", UF, 301L, 100_000L}
         ));
 
         RankingResponse response = service.calcularRanking(UF, "dengue", ANO, 20, "melhores");
 
         assertThat(response.getRanking().get(0).getCoIbge()).isEqualTo("31001");
         assertThat(response.getRanking().get(1).getCoIbge()).isEqualTo("31002");
+        assertThat(response.getRanking().get(0).getClassificacao()).isEqualTo("MODERADO");
+        assertThat(response.getRanking().get(1).getClassificacao()).isEqualTo("EPIDEMIA");
     }
 
     @Test
     void calcularRanking_ignoraMunicipioSemPopulacao() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
                 new Object[]{"31001", "Alfa", UF, 50L, 100_000L},
                 new Object[]{"31002", "SemPop", UF, 20L, null},
                 new Object[]{"31003", "ZeroPop", UF, 10L, 0L}
@@ -89,7 +88,7 @@ class RankingServiceTest {
 
     @Test
     void calcularRanking_limitaTopN() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
                 new Object[]{"31001", "Alfa", UF, 100L, 100_000L},
                 new Object[]{"31002", "Beta", UF, 200L, 100_000L},
                 new Object[]{"31003", "Gama", UF, 300L, 100_000L}
@@ -112,7 +111,7 @@ class RankingServiceTest {
                         100_000L
                 })
                 .toList();
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rows);
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rows);
 
         RankingResponse response = service.calcularRanking(UF, "dengue", ANO, 1500, "piores");
 
@@ -122,7 +121,7 @@ class RankingServiceTest {
 
     @Test
     void calcularPosicaoNoEstado_retornaPosicaoCorreta() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(rankingRows(
                 new Object[]{"31001", "Alfa", UF, 100L, 100_000L},
                 new Object[]{"31002", "Beta", UF, 300L, 100_000L},
                 new Object[]{"31003", "Gama", UF, 200L, 100_000L}
@@ -139,7 +138,7 @@ class RankingServiceTest {
 
     @Test
     void calcularPosicaoNoEstado_retornaNullSeMunicipioNaoEncontrado() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(
                 rankingRows(new Object[]{"31001", "Alfa", UF, 100L, 100_000L}));
 
         String posicao = service.calcularPosicaoNoEstado("99999", UF, "dengue", ANO);
@@ -149,7 +148,7 @@ class RankingServiceTest {
 
     @Test
     void calcularPosicaoNoEstado_retornaNullSeUfSemMunicipios() {
-        when(casoDengueRepository.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(Collections.emptyList());
+        when(casoDenguePort.rankingOtimizadoPorEstado(UF, ANO)).thenReturn(Collections.emptyList());
 
         String posicao = service.calcularPosicaoNoEstado("31001", UF, "dengue", ANO);
 

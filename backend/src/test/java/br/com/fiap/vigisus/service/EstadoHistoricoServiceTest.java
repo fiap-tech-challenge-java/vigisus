@@ -1,7 +1,9 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.domain.epidemiologia.CalculadoraTendenciaEpidemiologica;
+import br.com.fiap.vigisus.domain.epidemiologia.ClassificacaoEpidemiologicaPolicy;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,23 +19,27 @@ import static org.mockito.Mockito.when;
 class EstadoHistoricoServiceTest {
 
     @Mock
-    private CasoDengueRepository casoDengueRepository;
+    private CasoDenguePort casoDenguePort;
 
     private EstadoHistoricoService service;
 
     @BeforeEach
     void setUp() {
-        service = new EstadoHistoricoService(casoDengueRepository);
+        service = new EstadoHistoricoService(
+                casoDenguePort,
+                new ClassificacaoEpidemiologicaPolicy(),
+                new CalculadoraTendenciaEpidemiologica()
+        );
     }
 
     @Test
     void gerarPerfilEstado_normalizaUfECalculaTendencia() {
-        when(casoDengueRepository.agregaTotaisEstadoNoAno("MG", 2024)).thenReturn(List.<Object[]>of(new Object[]{450L, 100_000L}));
-        when(casoDengueRepository.agregaSemanasPorEstado("MG", 2024)).thenReturn(List.<Object[]>of(
+        when(casoDenguePort.agregaTotaisEstadoNoAno("MG", 2024)).thenReturn(List.<Object[]>of(new Object[]{450L, 100_000L}));
+        when(casoDenguePort.agregaSemanasPorEstado("MG", 2024)).thenReturn(List.<Object[]>of(
                 new Object[]{1, 10L}, new Object[]{2, 10L}, new Object[]{3, 10L}, new Object[]{4, 10L},
                 new Object[]{5, 20L}, new Object[]{6, 20L}, new Object[]{7, 20L}, new Object[]{8, 20L}
         ));
-        when(casoDengueRepository.agregaSemanasPorEstado("MG", 2023)).thenReturn(List.<Object[]>of(
+        when(casoDenguePort.agregaSemanasPorEstado("MG", 2023)).thenReturn(List.<Object[]>of(
                 new Object[]{1, 5L}, new Object[]{2, 6L}
         ));
 
@@ -51,11 +57,11 @@ class EstadoHistoricoServiceTest {
 
     @Test
     void gerarPerfilEstado_semDadosMantemValoresPadrao() {
-        when(casoDengueRepository.agregaTotaisEstadoNoAno("RJ", 2024)).thenReturn(List.of());
-        when(casoDengueRepository.agregaSemanasPorEstado("RJ", 2024)).thenReturn(List.<Object[]>of(
+        when(casoDenguePort.agregaTotaisEstadoNoAno("RJ", 2024)).thenReturn(List.of());
+        when(casoDenguePort.agregaSemanasPorEstado("RJ", 2024)).thenReturn(List.<Object[]>of(
                 new Object[]{1, 0L}, new Object[]{2, 0L}
         ));
-        when(casoDengueRepository.agregaSemanasPorEstado("RJ", 2023)).thenReturn(List.of());
+        when(casoDenguePort.agregaSemanasPorEstado("RJ", 2023)).thenReturn(List.of());
 
         PerfilEpidemiologicoResponse response = service.gerarPerfilEstado("rj", "dengue", 2024);
 

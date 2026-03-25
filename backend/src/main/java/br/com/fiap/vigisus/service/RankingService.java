@@ -1,9 +1,9 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.domain.epidemiologia.ClassificacaoEpidemiologicaPolicy;
 import br.com.fiap.vigisus.dto.RankingMunicipioDTO;
 import br.com.fiap.vigisus.dto.RankingResponse;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
-import br.com.fiap.vigisus.repository.MunicipioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -17,17 +17,14 @@ import java.util.stream.Collectors;
 public class RankingService {
 
     private static final int MAX_RANKING_LIMIT = 1000;
-    private static final double THRESHOLD_MODERADO = 50.0;
-    private static final double THRESHOLD_ALTO = 100.0;
-    private static final double THRESHOLD_EPIDEMIA = 300.0;
 
-    private final MunicipioRepository municipioRepository;
-    private final CasoDengueRepository casoDengueRepository;
+    private final CasoDenguePort casoDenguePort;
+    private final ClassificacaoEpidemiologicaPolicy classificacaoEpidemiologicaPolicy;
 
     @Cacheable(value = "ranking-municipal", key = "#uf + '-' + #doenca + '-' + #ano")
     public RankingResponse calcularRanking(String uf, String doenca, int ano, int top, String ordem) {
         int topLimitado = Math.min(top, MAX_RANKING_LIMIT);
-        List<Object[]> rankingData = casoDengueRepository.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);
+        List<Object[]> rankingData = casoDenguePort.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);
 
         List<RankingMunicipioDTO> rankingCompleto = rankingData.stream()
                 .map(this::mapearRankingMunicipio)
@@ -55,7 +52,7 @@ public class RankingService {
     }
 
     public String calcularPosicaoNoEstado(String coIbge, String uf, String doenca, int ano) {
-        List<Object[]> rankingData = casoDengueRepository.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);
+        List<Object[]> rankingData = casoDenguePort.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);
 
         List<RankingMunicipioDTO> rankingCompleto = rankingData.stream()
                 .map(this::mapearRankingMunicipio)
@@ -85,19 +82,7 @@ public class RankingService {
                 .totalCasos(totalCasos)
                 .populacao(populacao)
                 .incidencia100k(incidencia)
-                .classificacao(classificar(incidencia))
+                .classificacao(classificacaoEpidemiologicaPolicy.classificar(incidencia))
                 .build();
-    }
-
-    private String classificar(double incidencia) {
-        if (incidencia < THRESHOLD_MODERADO) {
-            return "BAIXO";
-        } else if (incidencia < THRESHOLD_ALTO) {
-            return "MODERADO";
-        } else if (incidencia <= THRESHOLD_EPIDEMIA) {
-            return "ALTO";
-        } else {
-            return "EPIDEMIA";
-        }
     }
 }

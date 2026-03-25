@@ -1,5 +1,7 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.domain.triagem.CalculadoraScoreTriagem;
+import br.com.fiap.vigisus.domain.triagem.PriorizacaoTriagemPolicy;
 import br.com.fiap.vigisus.dto.ComparativoEstadoDTO;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
@@ -41,7 +43,13 @@ class TriagemServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TriagemService(perfilService, encaminhamentoService, iaService);
+        service = new TriagemService(
+                perfilService,
+                encaminhamentoService,
+                iaService,
+                new CalculadoraScoreTriagem(),
+                new PriorizacaoTriagemPolicy()
+        );
     }
 
     @Test

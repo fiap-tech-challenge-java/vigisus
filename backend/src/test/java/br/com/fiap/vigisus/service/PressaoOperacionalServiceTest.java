@@ -1,12 +1,19 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.operacional.MescladorHospitaisReferencia;
+import br.com.fiap.vigisus.application.operacional.MontadorContextoOperacional;
+import br.com.fiap.vigisus.application.operacional.MontadorPrevisaoOperacional;
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.domain.epidemiologia.ClassificacaoEpidemiologicaPolicy;
+import br.com.fiap.vigisus.domain.operacional.CalculadoraNivelAtencaoOperacional;
+import br.com.fiap.vigisus.domain.operacional.CalculadoraTendenciaOperacional;
+import br.com.fiap.vigisus.domain.operacional.ChecklistOperacionalPolicy;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse.HospitalDTO;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.dto.PressaoOperacionalRequest;
 import br.com.fiap.vigisus.dto.PressaoOperacionalResponse;
 import br.com.fiap.vigisus.model.Municipio;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +40,7 @@ class PressaoOperacionalServiceTest {
     private MunicipioService municipioService;
 
     @Mock
-    private CasoDengueRepository casoDengueRepository;
+    private CasoDenguePort casoDenguePort;
 
     @Mock
     private PrevisaoRiscoService previsaoRiscoService;
@@ -61,11 +68,23 @@ class PressaoOperacionalServiceTest {
     @BeforeEach
     void setUp() {
         service = new PressaoOperacionalService(
-                municipioService, casoDengueRepository, previsaoRiscoService, encaminhamentoService, iaService);
+                municipioService,
+                casoDenguePort,
+                previsaoRiscoService,
+                encaminhamentoService,
+                iaService,
+                new ClassificacaoEpidemiologicaPolicy(),
+                new CalculadoraTendenciaOperacional(),
+                new CalculadoraNivelAtencaoOperacional(),
+                new MontadorPrevisaoOperacional(),
+                new MontadorContextoOperacional(),
+                new ChecklistOperacionalPolicy(),
+                new MescladorHospitaisReferencia()
+        );
 
         lenient().when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(MUNICIPIO);
-        lenient().when(casoDengueRepository.findCasosPorSemanas(anyString(), anyInt(), any())).thenReturn(List.of());
-        lenient().when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
+        lenient().when(casoDenguePort.findCasosPorSemanas(anyString(), anyInt(), any())).thenReturn(List.of());
+        lenient().when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
         lenient().when(iaService.gerarTextoOperacional(anyString())).thenReturn("Briefing de teste.");
         lenient().when(encaminhamentoService.buscarHospitais(anyString(), anyString(), anyInt()))
                 .thenReturn(EncaminhamentoResponse.builder().coIbge(CO_IBGE).municipioOrigem("Lavras").tpLeito("74").hospitais(List.of()).build());
@@ -73,9 +92,9 @@ class PressaoOperacionalServiceTest {
 
     @Test
     void testUPAComMuitasSuspeitasEmEpidemiaDeveSerCritica() {
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(307L);
+        when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(307L);
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), anyInt(), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), anyInt(), any()))
                 .thenReturn(buildSemanas(currentWeek, 100L, 110L, 150L, 200L));
         when(previsaoRiscoService.calcularRisco(CO_IBGE)).thenReturn(
                 PrevisaoRiscoResponse.builder()
@@ -95,7 +114,7 @@ class PressaoOperacionalServiceTest {
 
     @Test
     void testUBSComPoucasSuspeitasContextoBaixoDeveSerNormal() {
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
+        when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
         when(previsaoRiscoService.calcularRisco(CO_IBGE)).thenReturn(
                 PrevisaoRiscoResponse.builder().coIbge(CO_IBGE).municipio("Lavras").score(0).classificacao("BAIXO").fatores(List.of()).build());
 
@@ -143,11 +162,11 @@ class PressaoOperacionalServiceTest {
     @Test
     void construirContexto_quandoAnoAnteriorSemDados_retornaComparativoInsuficienteECrescente() {
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
                 .thenReturn(buildSemanas(currentWeek, 0L, 0L, 0L, 5L));
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
                 .thenReturn(List.of());
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(0L);
+        when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(0L);
 
         PressaoOperacionalResponse.ContextoEpidemiologicoDTO contexto = service.construirContexto(CO_IBGE);
 
@@ -160,11 +179,11 @@ class PressaoOperacionalServiceTest {
     @Test
     void construirContexto_quandoMesmoVolume_retornaComparativoSemelhanteEEstavel() {
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
                 .thenReturn(buildSemanas(currentWeek, 10L, 10L, 10L, 10L));
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
                 .thenReturn(buildSemanas(currentWeek, 10L, 10L, 10L, 10L));
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(0L);
+        when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(0L);
 
         PressaoOperacionalResponse.ContextoEpidemiologicoDTO contexto = service.construirContexto(CO_IBGE);
 
@@ -175,11 +194,11 @@ class PressaoOperacionalServiceTest {
     @Test
     void avaliarPressao_quandoRiscoIndisponivel_usaFallbackNaPrevisaoEPadraoHistorico() {
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear()), any()))
                 .thenReturn(buildSemanas(currentWeek, 1L, 1L, 1L, 1L));
-        when(casoDengueRepository.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(CO_IBGE), eq(LocalDate.now().getYear() - 1), any()))
                 .thenReturn(List.of());
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(40L);
+        when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(CO_IBGE, LocalDate.now().getYear())).thenReturn(40L);
         when(previsaoRiscoService.calcularRisco(CO_IBGE)).thenThrow(new RuntimeException("sem clima"));
 
         PressaoOperacionalResponse resp = service.avaliarPressao(new PressaoOperacionalRequest(CO_IBGE, 3, "UBS"));
@@ -196,11 +215,11 @@ class PressaoOperacionalServiceTest {
         Municipio outro = Municipio.builder().coIbge(outroIbge).noMunicipio("Cidade X").sgUf("MG").build();
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
         when(municipioService.buscarPorCoIbge(outroIbge)).thenReturn(outro).thenThrow(new RuntimeException("sem populacao"));
-        when(casoDengueRepository.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear()), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear()), any()))
                 .thenReturn(buildSemanas(currentWeek, 2L, 2L, 2L, 2L));
-        when(casoDengueRepository.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear() - 1), any()))
+        when(casoDenguePort.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear() - 1), any()))
                 .thenReturn(List.of());
-        when(casoDengueRepository.sumTotalCasosByCoMunicipioAndAno(outroIbge, LocalDate.now().getYear())).thenReturn(80L);
+        when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(outroIbge, LocalDate.now().getYear())).thenReturn(80L);
         when(previsaoRiscoService.calcularRisco(outroIbge)).thenReturn(
                 PrevisaoRiscoResponse.builder().coIbge(outroIbge).municipio("Cidade X").score(0).classificacao("BAIXO").fatores(List.of()).build());
 

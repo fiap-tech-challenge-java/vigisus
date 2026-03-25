@@ -1,8 +1,7 @@
 package br.com.fiap.vigisus.controller;
 
+import br.com.fiap.vigisus.application.epidemiologia.ConsultarPerfilEpidemiologicoUseCase;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
-import br.com.fiap.vigisus.service.IaService;
-import br.com.fiap.vigisus.service.PerfilEpidemiologicoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -13,42 +12,32 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
-
 @RestController
 @RequestMapping("/api/perfil")
-@Tag(name = "Perfil Epidemiológico")
+@Tag(name = "Perfil Epidemiologico")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class PerfilController {
 
-    private final PerfilEpidemiologicoService perfilService;
-    private final IaService iaService;
+    private final ConsultarPerfilEpidemiologicoUseCase consultarPerfilEpidemiologicoUseCase;
 
     @GetMapping("/{coIbge}")
     @Operation(
-            summary = "Perfil epidemiológico do município",
+            summary = "Perfil epidemiologico do municipio",
             description = """
-                    Retorna o histórico de casos de dengue por semana epidemiológica,
-                    incidência por 100 mil habitantes, classificação e posição no
+                    Retorna o historico de casos de dengue por semana epidemiologica,
+                    incidencia por 100 mil habitantes, classificacao e posicao no
                     ranking estadual.
 
-                    Fontes: SINAN (casos notificados), IBGE (população).
-                    Retorna contexto informacional baseado em dados públicos do SUS.
-                    Não realiza diagnóstico, triagem clínica nem define conduta médica.
-                    A decisão final permanece com o profissional de saúde habilitado.
+                    Fontes: SINAN (casos notificados), IBGE (populacao).
+                    Retorna contexto informacional baseado em dados publicos do SUS.
+                    Nao realiza diagnostico, triagem clinica nem define conduta medica.
+                    A decisao final permanece com o profissional de saude habilitado.
                     """)
     public PerfilEpidemiologicoResponse getPerfil(
             @PathVariable String coIbge,
             @RequestParam(defaultValue = "dengue") String doenca,
             @RequestParam(required = false) Integer ano) {
-
-        if (ano == null) {
-            ano = LocalDate.now().getYear();
-        }
-
-        PerfilEpidemiologicoResponse perfil = perfilService.gerarPerfil(coIbge, doenca, ano);
-        perfil.setTextoIa(iaService.gerarTextoEpidemiologico(perfil));
-        return perfil;
+        return consultarPerfilEpidemiologicoUseCase.buscarMunicipio(coIbge, doenca, ano);
     }
 }

@@ -1,5 +1,6 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.ClimaPort;
 import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoDailyData;
@@ -16,12 +17,13 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ClimaService {
+public class ClimaService implements ClimaPort {
 
     private static final String OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 
     private final RestTemplate restTemplate;
 
+    @Override
     @Cacheable(value = "clima-atual", key = "#lat + ',' + #lon")
     public ClimaAtualDTO buscarClimaAtual(double lat, double lon) {
         String url = UriComponentsBuilder.fromHttpUrl(OPEN_METEO_URL)
@@ -43,6 +45,7 @@ public class ClimaService {
                 .build();
     }
 
+    @Override
     public List<PrevisaoDiariaDTO> buscarPrevisao16Dias(double lat, double lon) {
         String url = UriComponentsBuilder.fromHttpUrl(OPEN_METEO_URL)
                 .queryParam("latitude", lat)

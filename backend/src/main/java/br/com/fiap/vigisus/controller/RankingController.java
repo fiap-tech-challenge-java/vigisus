@@ -1,9 +1,9 @@
 package br.com.fiap.vigisus.controller;
 
-import br.com.fiap.vigisus.dto.RankingResponse;
+import br.com.fiap.vigisus.application.epidemiologia.ConsultarHistoricoEstadoUseCase;
+import br.com.fiap.vigisus.application.epidemiologia.ConsultarRankingMunicipalUseCase;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
-import br.com.fiap.vigisus.service.EstadoHistoricoService;
-import br.com.fiap.vigisus.service.RankingService;
+import br.com.fiap.vigisus.dto.RankingResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
-
 @RestController
 @RequestMapping("/api/ranking")
 @Tag(name = "Ranking Municipal")
@@ -22,21 +20,21 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class RankingController {
 
-    private final RankingService rankingService;
-    private final EstadoHistoricoService estadoHistoricoService;
+    private final ConsultarRankingMunicipalUseCase consultarRankingMunicipalUseCase;
+    private final ConsultarHistoricoEstadoUseCase consultarHistoricoEstadoUseCase;
 
     @GetMapping
     @Operation(
-            summary = "Ranking municipal por incidência",
+            summary = "Ranking municipal por incidencia",
             description = """
-                    Retorna municípios ordenados por incidência de dengue por
-                    100 mil habitantes. Útil para identificar regiões de maior
-                    pressão epidemiológica.
+                    Retorna municipios ordenados por incidencia de dengue por
+                    100 mil habitantes. Util para identificar regioes de maior
+                    pressao epidemiologica.
 
-                    Fontes: SINAN (casos), IBGE (população estimada).
-                    Retorna contexto informacional baseado em dados públicos do SUS.
-                    Não realiza diagnóstico, triagem clínica nem define conduta médica.
-                    A decisão final permanece com o profissional de saúde habilitado.
+                    Fontes: SINAN (casos), IBGE (populacao estimada).
+                    Retorna contexto informacional baseado em dados publicos do SUS.
+                    Nao realiza diagnostico, triagem clinica nem define conduta medica.
+                    A decisao final permanece com o profissional de saude habilitado.
                     """)
     public RankingResponse getRanking(
             @RequestParam String uf,
@@ -44,28 +42,18 @@ public class RankingController {
             @RequestParam(required = false) Integer ano,
             @RequestParam(defaultValue = "20") int top,
             @RequestParam(defaultValue = "piores") String ordem) {
-
-        if (ano == null) {
-            ano = LocalDate.now().getYear();
-        }
-
-        return rankingService.calcularRanking(uf, doenca, ano, top, ordem);
+        return consultarRankingMunicipalUseCase.buscar(uf, doenca, ano, top, ordem);
     }
 
     @GetMapping("/estado-historico")
     @Operation(
-            summary = "Histórico agregado do estado por semana",
-            description = "Retorna série semanal, total anual, incidência e classificação agregadas para o estado informado."
+            summary = "Historico agregado do estado por semana",
+            description = "Retorna serie semanal, total anual, incidencia e classificacao agregadas para o estado informado."
     )
     public PerfilEpidemiologicoResponse getHistoricoEstado(
             @RequestParam String uf,
             @RequestParam(defaultValue = "dengue") String doenca,
             @RequestParam(required = false) Integer ano) {
-
-        if (ano == null) {
-            ano = LocalDate.now().getYear();
-        }
-
-        return estadoHistoricoService.gerarPerfilEstado(uf, doenca, ano);
+        return consultarHistoricoEstadoUseCase.buscar(uf, doenca, ano);
     }
 }

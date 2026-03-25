@@ -1,10 +1,9 @@
 package br.com.fiap.vigisus.controller;
 
+import br.com.fiap.vigisus.application.risco.ConsultarPrevisaoRiscoUseCase;
+import br.com.fiap.vigisus.application.risco.ConsultarRiscoAgregadoUseCase;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.model.Estabelecimento;
-import br.com.fiap.vigisus.service.IaService;
-import br.com.fiap.vigisus.service.PrevisaoRiscoService;
-import br.com.fiap.vigisus.service.RiscoAgregadoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,72 +18,60 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/previsao-risco")
-@Tag(name = "Previsão de Risco")
+@Tag(name = "Previsao de Risco")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class PrevisaoRiscoController {
 
-    private final PrevisaoRiscoService previsaoRiscoService;
-    private final RiscoAgregadoService riscoAgregadoService;
-    private final IaService iaService;
+    private final ConsultarPrevisaoRiscoUseCase consultarPrevisaoRiscoUseCase;
+    private final ConsultarRiscoAgregadoUseCase consultarRiscoAgregadoUseCase;
 
     @GetMapping("/{coIbge}")
     @Operation(
-            summary = "Previsão de risco epidemiológico",
+            summary = "Previsao de risco epidemiologico",
             description = """
-                    Calcula score de risco para as próximas 2 semanas cruzando
-                    padrão sazonal histórico (SINAN) com previsão climática
-                    (Open-Meteo). Baseado em evidência científica publicada sobre
-                    condições favoráveis ao Aedes aegypti.
+                    Calcula score de risco para as proximas 2 semanas cruzando
+                    padrao sazonal historico (SINAN) com previsao climatica
+                    (Open-Meteo). Baseado em evidencia cientifica publicada sobre
+                    condicoes favoraveis ao Aedes aegypti.
 
                     Score 0-8: 0-1 Baixo · 2-3 Moderado · 4-5 Alto · 6+ Muito Alto.
-                    Retorna contexto informacional baseado em dados públicos do SUS.
-                    Não realiza diagnóstico, triagem clínica nem define conduta médica.
-                    A decisão final permanece com o profissional de saúde habilitado.
+                    Retorna contexto informacional baseado em dados publicos do SUS.
+                    Nao realiza diagnostico, triagem clinica nem define conduta medica.
+                    A decisao final permanece com o profissional de saude habilitado.
                     """)
     public PrevisaoRiscoResponse getPrevisaoRisco(
             @PathVariable String coIbge,
             @RequestParam(defaultValue = "dengue") String doenca) {
-
-        PrevisaoRiscoResponse previsao = previsaoRiscoService.calcularRisco(coIbge);
-        previsao.setTextoIa(iaService.gerarTextoRisco(previsao));
-        return previsao;
+        return consultarPrevisaoRiscoUseCase.buscarPorMunicipio(coIbge);
     }
 
     @GetMapping("/brasil/risco-agregado")
     @Operation(
             summary = "Risco agregado para o Brasil",
             description = """
-                    Calcula o risco epidemiológico agregado para todo o Brasil
-                    baseado na coordenada média de todos os municípios. Retorna
-                    classificação de risco e previsão diária para os próximos 14 dias.
-                    
+                    Calcula o risco epidemiologico agregado para todo o Brasil
+                    baseado na coordenada media de todos os municipios. Retorna
+                    classificacao de risco e previsao diaria para os proximos 14 dias.
+
                     Score 0-8: 0-1 Baixo · 2-3 Moderado · 4-5 Alto · 6+ Muito Alto.
                     """)
     public PrevisaoRiscoResponse getRiscoBrasil() {
-        PrevisaoRiscoResponse risco = riscoAgregadoService.calcularRiscoBrasil();
-        if (risco != null) {
-            risco.setTextoIa(iaService.gerarTextoRisco(risco));
-        }
-        return risco;
+        return consultarRiscoAgregadoUseCase.buscarBrasil();
     }
 
     @GetMapping("/estado/{uf}/risco-agregado")
     @Operation(
             summary = "Risco agregado para um estado",
             description = """
-                    Calcula o risco epidemiológico agregado para um estado específico
-                    baseado na coordenada média de seus municípios. Retorna
-                    classificação de risco e previsão diária para os próximos 14 dias.
-                    
+                    Calcula o risco epidemiologico agregado para um estado especifico
+                    baseado na coordenada media de seus municipios. Retorna
+                    classificacao de risco e previsao diaria para os proximos 14 dias.
+
                     Score 0-8: 0-1 Baixo · 2-3 Moderado · 4-5 Alto · 6+ Muito Alto.
                     """)
     public PrevisaoRiscoResponse getRiscoEstado(@PathVariable String uf) {
-        PrevisaoRiscoResponse risco = riscoAgregadoService.calcularRiscoEstado(uf);
-        if (risco != null) {
-            risco.setTextoIa(iaService.gerarTextoRisco(risco));
-        }
-        return risco;
+        return consultarRiscoAgregadoUseCase.buscarEstado(uf);
     }
 
     @GetMapping("/brasil/hospitais-capitais")
@@ -92,22 +79,22 @@ public class PrevisaoRiscoController {
             summary = "Hospitais das capitais do Brasil",
             description = """
                     Retorna lista de hospitais localizados nas capitais de todos
-                    os estados do Brasil. Útil para visualização e planejamento de
-                    referência regionais.
+                    os estados do Brasil. Util para visualizacao e planejamento de
+                    referenciais regionais.
                     """)
     public List<Estabelecimento> getHospitaisBrasil() {
-        return riscoAgregadoService.buscarHospitaisBrasil();
+        return consultarRiscoAgregadoUseCase.buscarHospitaisBrasil();
     }
 
     @GetMapping("/estado/{uf}/hospitais-regiao")
     @Operation(
-            summary = "Hospitais da capital e região próxima",
+            summary = "Hospitais da capital e regiao proxima",
             description = """
                     Retorna lista de hospitais da capital do estado mais
                     hospitais dentro de um raio de 100 km da capital.
                     Ordenados por proximidade.
                     """)
     public List<Estabelecimento> getHospitaisEstado(@PathVariable String uf) {
-        return riscoAgregadoService.buscarHospitaisEstado(uf);
+        return consultarRiscoAgregadoUseCase.buscarHospitaisEstado(uf);
     }
 }

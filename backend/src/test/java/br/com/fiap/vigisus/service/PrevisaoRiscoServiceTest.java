@@ -1,5 +1,8 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.domain.geografia.CatalogoGeograficoBrasil;
+import br.com.fiap.vigisus.domain.risco.CalculadoraRiscoClimatico;
+import br.com.fiap.vigisus.domain.risco.ClassificacaoRiscoMunicipioPolicy;
 import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
@@ -43,7 +46,13 @@ class PrevisaoRiscoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PrevisaoRiscoService(municipioService, climaService);
+        service = new PrevisaoRiscoService(
+                municipioService,
+                climaService,
+                new CatalogoGeograficoBrasil(),
+                new CalculadoraRiscoClimatico(),
+                new ClassificacaoRiscoMunicipioPolicy()
+        );
         lenient().when(municipioService.buscarPorCoIbge("3131307")).thenReturn(LAVRAS);
     }
 

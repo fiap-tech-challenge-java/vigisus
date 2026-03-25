@@ -1,7 +1,8 @@
 package br.com.fiap.vigisus.controller;
 
+import br.com.fiap.vigisus.application.encaminhamento.ConsultarHospitaisCapitaisUseCase;
+import br.com.fiap.vigisus.application.encaminhamento.ConsultarHospitaisUseCase;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
-import br.com.fiap.vigisus.service.EncaminhamentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,23 +21,22 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HospitalController {
 
-    private final EncaminhamentoService encaminhamentoService;
+    private final ConsultarHospitaisUseCase consultarHospitaisUseCase;
+    private final ConsultarHospitaisCapitaisUseCase consultarHospitaisCapitaisUseCase;
 
     @GetMapping
-    @Operation(summary = "Lista hospitais num raio informado com o serviço solicitado")
+    @Operation(summary = "Lista hospitais num raio informado com o servico solicitado")
     public List<EncaminhamentoResponse.HospitalDTO> getHospitais(
             @RequestParam String municipio,
             @RequestParam(defaultValue = "74") String tpLeito,
             @RequestParam(defaultValue = "1") int minLeitosSus) {
-
-        return encaminhamentoService.buscarHospitais(municipio, tpLeito, minLeitosSus).getHospitais();
+        return consultarHospitaisUseCase.executar(municipio, tpLeito, minLeitosSus);
     }
 
     @GetMapping("/capitais")
     @Operation(summary = "Lista principais hospitais das capitais estaduais")
     public List<EncaminhamentoResponse.HospitalDTO> getHospitaisCapitais(
             @RequestParam(required = false) String uf) {
-        
-        return encaminhamentoService.buscarHospitaisDasCapitais(uf);
+        return consultarHospitaisCapitaisUseCase.executar(uf);
     }
 }

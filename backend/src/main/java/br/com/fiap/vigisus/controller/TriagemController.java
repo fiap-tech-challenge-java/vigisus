@@ -1,8 +1,9 @@
 package br.com.fiap.vigisus.controller;
 
+import br.com.fiap.vigisus.application.triagem.AvaliarTriagemUseCase;
+import br.com.fiap.vigisus.application.triagem.ConsultarCatalogoTriagemUseCase;
 import br.com.fiap.vigisus.dto.TriagemRequest;
 import br.com.fiap.vigisus.dto.TriagemResponse;
-import br.com.fiap.vigisus.service.TriagemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,39 +25,30 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TriagemController {
 
-    private final TriagemService triagemService;
+    private final AvaliarTriagemUseCase avaliarTriagemUseCase;
+    private final ConsultarCatalogoTriagemUseCase consultarCatalogoTriagemUseCase;
 
     @PostMapping("/avaliar")
     @Operation(
-            summary = "Contexto clínico-epidemiológico",
+            summary = "Contexto clinico-epidemiologico",
             description = """
-                    Organiza sintomas informados com o contexto epidemiológico
-                    real do município para apoio informacional ao profissional.
+                    Organiza sintomas informados com o contexto epidemiologico
+                    real do municipio para apoio informacional ao profissional.
 
-                    NÃO realiza triagem clínica, diagnóstico ou classificação
-                    de risco clínico. A avaliação e decisão são exclusivamente
-                    do profissional de saúde habilitado.
+                    NAO realiza triagem clinica, diagnostico ou classificacao
+                    de risco clinico. A avaliacao e decisao sao exclusivamente
+                    do profissional de saude habilitado.
 
-                    Retorna contexto informacional baseado em dados públicos do SUS.
-                    Fontes: SINAN (contexto epidemiológico), CNES (hospitais).
+                    Retorna contexto informacional baseado em dados publicos do SUS.
+                    Fontes: SINAN (contexto epidemiologico), CNES (hospitais).
                     """)
     public TriagemResponse avaliar(@Valid @RequestBody TriagemRequest request) {
-        return triagemService.avaliar(request);
+        return avaliarTriagemUseCase.executar(request);
     }
 
     @GetMapping("/sintomas-validos")
     @Operation(summary = "Lista sintomas aceitos pelo sistema")
     public Map<String, List<String>> sintomas() {
-        return Map.of(
-                "sintomas", List.of(
-                        "febre", "dor_muscular", "dor_retro_orbital", "cefaleia",
-                        "exantema", "nausea", "vomito", "dor_abdominal",
-                        "sangramento", "prostacao", "tontura", "falta_ar"
-                ),
-                "comorbidades", List.of(
-                        "diabetes", "hipertensao", "obesidade", "gestante",
-                        "doenca_renal", "doenca_cardiaca", "imunossupressao"
-                )
-        );
+        return consultarCatalogoTriagemUseCase.executar();
     }
 }

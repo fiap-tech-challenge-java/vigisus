@@ -1,15 +1,17 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.encaminhamento.SelecionadorHospitaisProximos;
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.application.port.RedeAssistencialPort;
+import br.com.fiap.vigisus.domain.encaminhamento.ClassificacaoPressaoSusPolicy;
+import br.com.fiap.vigisus.domain.geografia.CalculadoraDistanciaGeografica;
+import br.com.fiap.vigisus.domain.geografia.CatalogoGeograficoBrasil;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse.HospitalDTO;
 import br.com.fiap.vigisus.model.Estabelecimento;
 import br.com.fiap.vigisus.model.Leito;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.model.ServicoEspecializado;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
-import br.com.fiap.vigisus.repository.EstabelecimentoRepository;
-import br.com.fiap.vigisus.repository.LeitoRepository;
-import br.com.fiap.vigisus.repository.ServicoEspecializadoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,16 +36,10 @@ class EncaminhamentoServiceTest {
     private MunicipioService municipioService;
 
     @Mock
-    private EstabelecimentoRepository estabelecimentoRepository;
+    private RedeAssistencialPort redeAssistencialPort;
 
     @Mock
-    private LeitoRepository leitoRepository;
-
-    @Mock
-    private ServicoEspecializadoRepository servicoEspecializadoRepository;
-
-    @Mock
-    private CasoDengueRepository casoDengueRepository;
+    private CasoDenguePort casoDenguePort;
 
     private EncaminhamentoService service;
 
@@ -54,10 +50,16 @@ class EncaminhamentoServiceTest {
     @BeforeEach
     void setUp() {
         service = new EncaminhamentoService(
-                municipioService, estabelecimentoRepository, leitoRepository, servicoEspecializadoRepository,
-                casoDengueRepository);
+                municipioService,
+                redeAssistencialPort,
+                casoDenguePort,
+                new CatalogoGeograficoBrasil(),
+                new CalculadoraDistanciaGeografica(),
+                new ClassificacaoPressaoSusPolicy(),
+                new SelecionadorHospitaisProximos(new CalculadoraDistanciaGeografica())
+        );
         org.mockito.Mockito.lenient()
-                .when(casoDengueRepository.findByCoMunicipioAndAno(org.mockito.ArgumentMatchers.anyString(),
+                .when(casoDenguePort.findByCoMunicipioAndAno(org.mockito.ArgumentMatchers.anyString(),
                         org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(java.util.List.of());
     }
@@ -99,7 +101,7 @@ class EncaminhamentoServiceTest {
 
         Leito leito1 = Leito.builder().coCnes("CNES001").tpLeito("81").qtSus(5).build();
         Leito leito2 = Leito.builder().coCnes("CNES002").tpLeito("81").qtSus(3).build();
-        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("81"), anyInt()))
+        when(redeAssistencialPort.buscarLeitosPorTipoComMinimoSus(eq("81"), anyInt()))
                 .thenReturn(List.of(leito1, leito2));
 
         // Hospital farther away (~30 km from Lavras, within 50 km radius)
@@ -120,9 +122,9 @@ class EncaminhamentoServiceTest {
                 .nuLongitude(-45.010)
                 .build();
 
-        when(estabelecimentoRepository.findByCoCnesIn(any()))
+        when(redeAssistencialPort.buscarEstabelecimentosPorCnes(any()))
                 .thenReturn(List.of(hospVarginha, hospLavras));
-        when(servicoEspecializadoRepository.findByCoCnesIn(any())).thenReturn(List.of());
+        when(redeAssistencialPort.buscarServicosPorCnes(any())).thenReturn(List.of());
 
         EncaminhamentoResponse response = service.buscarHospitais("3131307", "81", 1);
 
@@ -147,7 +149,7 @@ class EncaminhamentoServiceTest {
         when(municipioService.buscarPorCoIbge("1234567")).thenReturn(municipio);
 
         Leito leito = Leito.builder().coCnes("CNES999").tpLeito("74").qtSus(2).build();
-        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("74"), anyInt()))
+        when(redeAssistencialPort.buscarLeitosPorTipoComMinimoSus(eq("74"), anyInt()))
                 .thenReturn(List.of(leito));
 
         // Hospital about 100 km away (within 150 km radius but not 50 km)
@@ -159,8 +161,8 @@ class EncaminhamentoServiceTest {
                 .nuLongitude(-50.0)
                 .build();
 
-        when(estabelecimentoRepository.findByCoCnesIn(any())).thenReturn(List.of(hosp));
-        when(servicoEspecializadoRepository.findByCoCnesIn(any())).thenReturn(List.of());
+        when(redeAssistencialPort.buscarEstabelecimentosPorCnes(any())).thenReturn(List.of(hosp));
+        when(redeAssistencialPort.buscarServicosPorCnes(any())).thenReturn(List.of());
 
         EncaminhamentoResponse response = service.buscarHospitais("1234567", "74", 1);
 
@@ -180,7 +182,7 @@ class EncaminhamentoServiceTest {
         when(municipioService.buscarPorCoIbge("3131307")).thenReturn(municipio);
 
         Leito leito = Leito.builder().coCnes("CNES001").tpLeito("74").qtSus(1).build();
-        when(leitoRepository.findByTpLeitoAndQtSusGreaterThanEqual(eq("74"), anyInt()))
+        when(redeAssistencialPort.buscarLeitosPorTipoComMinimoSus(eq("74"), anyInt()))
                 .thenReturn(List.of(leito));
 
         Estabelecimento hosp = Estabelecimento.builder()
@@ -191,13 +193,13 @@ class EncaminhamentoServiceTest {
                 .nuLongitude(LON_LAVRAS)
                 .build();
 
-        when(estabelecimentoRepository.findByCoCnesIn(any())).thenReturn(List.of(hosp));
+        when(redeAssistencialPort.buscarEstabelecimentosPorCnes(any())).thenReturn(List.of(hosp));
 
         ServicoEspecializado servico = ServicoEspecializado.builder()
                 .coCnes("CNES001")
                 .servEsp("135")
                 .build();
-        when(servicoEspecializadoRepository.findByCoCnesIn(any())).thenReturn(List.of(servico));
+        when(redeAssistencialPort.buscarServicosPorCnes(any())).thenReturn(List.of(servico));
 
         EncaminhamentoResponse response = service.buscarHospitais("3131307", "74", 1);
 

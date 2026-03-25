@@ -1,8 +1,8 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.MunicipioPort;
 import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
 import br.com.fiap.vigisus.model.Municipio;
-import br.com.fiap.vigisus.repository.MunicipioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,13 +20,13 @@ import static org.mockito.Mockito.when;
 class MunicipioServiceTest {
 
     @Mock
-    private MunicipioRepository municipioRepository;
+    private MunicipioPort municipioPort;
 
     private MunicipioService service;
 
     @BeforeEach
     void setUp() {
-        service = new MunicipioService(municipioRepository);
+        service = new MunicipioService(municipioPort);
     }
 
     @Test
@@ -36,7 +36,7 @@ class MunicipioServiceTest {
                 .noMunicipio("Lavras")
                 .sgUf("MG")
                 .build();
-        when(municipioRepository.findByCoIbge("3131307")).thenReturn(Optional.of(municipio));
+        when(municipioPort.findByCoIbge("3131307")).thenReturn(Optional.of(municipio));
 
         Municipio result = service.buscarPorCoIbge("3131307");
 
@@ -45,7 +45,7 @@ class MunicipioServiceTest {
 
     @Test
     void buscarPorCoIbge_quandoNaoEncontrado_lancaMunicipioNotFoundException() {
-        when(municipioRepository.findByCoIbge("9999999")).thenReturn(Optional.empty());
+        when(municipioPort.findByCoIbge("9999999")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.buscarPorCoIbge("9999999"))
                 .isInstanceOf(MunicipioNotFoundException.class)
@@ -58,7 +58,7 @@ class MunicipioServiceTest {
                 .noMunicipio("Lavras")
                 .sgUf("MG")
                 .build();
-        when(municipioRepository.findBySgUf("MG")).thenReturn(List.of(municipio));
+        when(municipioPort.findBySgUf("MG")).thenReturn(List.of(municipio));
 
         List<Municipio> result = service.listarPorUf("MG");
 
@@ -72,7 +72,7 @@ class MunicipioServiceTest {
                 .noMunicipio("Lavras")
                 .sgUf("MG")
                 .build();
-        when(municipioRepository.findByNoMunicipioContainingIgnoreCaseAndSgUf("Lav", "MG"))
+        when(municipioPort.findByNoMunicipioContainingIgnoreCaseAndSgUf("Lav", "MG"))
                 .thenReturn(List.of(municipio));
 
         List<Municipio> result = service.buscarPorNomeEUf("Lav", "MG");
@@ -87,7 +87,7 @@ class MunicipioServiceTest {
                 .noMunicipio("Lavras")
                 .sgUf("MG")
                 .build();
-        when(municipioRepository.findTop1ByNoMunicipioContainingIgnoreCase("Lavras"))
+        when(municipioPort.findTop1ByNoMunicipioContainingIgnoreCase("Lavras"))
                 .thenReturn(Optional.of(municipio));
 
         Optional<Municipio> result = service.buscarPorNome("Lavras");

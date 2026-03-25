@@ -1,70 +1,70 @@
 package br.com.fiap.vigisus.service;
 
-import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
-import br.com.fiap.vigisus.dto.RiscoDiarioDTO;
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.application.port.ClimaPort;
+import br.com.fiap.vigisus.application.port.MunicipioPort;
+import br.com.fiap.vigisus.application.port.RedeAssistencialPort;
+import br.com.fiap.vigisus.domain.geografia.CatalogoGeograficoBrasil;
+import br.com.fiap.vigisus.domain.risco.CalculadoraRiscoClimatico;
+import br.com.fiap.vigisus.domain.risco.ClassificacaoRiscoAgregadoPolicy;
+import br.com.fiap.vigisus.domain.risco.MetricasRiscoClimatico;
 import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
-import br.com.fiap.vigisus.model.Municipio;
+import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
+import br.com.fiap.vigisus.dto.RiscoDiarioDTO;
 import br.com.fiap.vigisus.model.Estabelecimento;
-import br.com.fiap.vigisus.repository.MunicipioRepository;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
-import br.com.fiap.vigisus.repository.EstabelecimentoRepository;
+import br.com.fiap.vigisus.model.Municipio;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Serviço para calcular RISCO AGREGADO em nível Brasil e Estado.
- *
- * O risco é calculado com base em dados climáticos (temperatura, chuva, umidade)
- * da região agregada, usando a coordenada média como ponto central.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RiscoAgregadoService {
 
-    private final MunicipioRepository municipioRepository;
-    private final CasoDengueRepository casoDengueRepository;
-    private final EstabelecimentoRepository estabelecimentoRepository;
-    private final ClimaService climaService;
-    private final PrevisaoRiscoService previsaoRiscoService;
+    private static final List<String> UFS_BRASIL = List.of(
+            "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+            "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+    );
 
-    // ─────────────────────────────────────────────────────────────────────
-    // RISCO BRASIL
-    // ─────────────────────────────────────────────────────────────────────
+    private final MunicipioPort municipioPort;
+    private final CasoDenguePort casoDenguePort;
+    private final RedeAssistencialPort redeAssistencialPort;
+    private final ClimaPort climaService;
+    private final CatalogoGeograficoBrasil catalogoGeograficoBrasil;
+    private final CalculadoraRiscoClimatico calculadoraRiscoClimatico;
+    private final ClassificacaoRiscoAgregadoPolicy classificacaoRiscoPolicy;
 
     @Cacheable(value = "risco-brasil", key = "'todos'")
     public PrevisaoRiscoResponse calcularRiscoBrasil() {
         log.info("[RiscoBrasil] Calculando risco agregado do Brasil");
 
-        // 1. Buscar coordenada média do Brasil
-        List<Municipio> todosMunicipios = municipioRepository.findAll();
+        List<Municipio> todosMunicipios = municipioPort.findAll();
         double[] coordMedia = calcularCoordenadaMedia(todosMunicipios);
+        log.info("[RiscoBrasil] Coordenada media: lat={}, lon={}", coordMedia[0], coordMedia[1]);
 
-        log.info("[RiscoBrasil] Coordenada média: lat={}, lon={}", coordMedia[0], coordMedia[1]);
-
-        // 2. Buscar clima da coordenada média
         ClimaAtualDTO climaAtual = climaService.buscarClimaAtual(coordMedia[0], coordMedia[1]);
         List<PrevisaoDiariaDTO> previsao16Dias = climaService.buscarPrevisao16Dias(coordMedia[0], coordMedia[1]);
+        MetricasRiscoClimatico metricas = calculadoraRiscoClimatico.extrairMetricas(climaAtual, previsao16Dias);
 
-        // 3. Calcular score (mesmo algoritmo que município)
-        List<String> fatores = new ArrayList<>();
-        int score = calcularScore(climaAtual, previsao16Dias, fatores);
-        String classificacao = classificar(score);
-
-        // 4. Calcular risco dos 14 dias
+        int score = calculadoraRiscoClimatico.calcularScore(metricas);
+        List<String> fatores = montarFatores(metricas);
+        String classificacao = classificacaoRiscoPolicy.classificar(score);
         List<RiscoDiarioDTO> risco14Dias = calcularRisco14Dias(previsao16Dias);
-
-        // 5. Calcular incidência histórica agregada (CACHE)
         double incidenciaHistorica = calcularIncidenciaMediaBrasil(2024);
 
-        log.info("[RiscoBrasil] Score={}, Classificação={}, Incidência={}", score, classificacao, incidenciaHistorica);
+        log.info("[RiscoBrasil] Score={}, Classificacao={}, Incidencia={}",
+                score, classificacao, incidenciaHistorica);
 
         return PrevisaoRiscoResponse.builder()
                 .coIbge("00")
@@ -77,46 +77,36 @@ public class RiscoAgregadoService {
                 .build();
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // RISCO ESTADO
-    // ─────────────────────────────────────────────────────────────────────
-
     @Cacheable(value = "risco-estado", key = "#uf")
     public PrevisaoRiscoResponse calcularRiscoEstado(String uf) {
         log.info("[RiscoEstado] Calculando risco agregado para {}", uf);
         String ufUpper = uf.toUpperCase();
 
-        // 1. Buscar municípios do estado
-        List<Municipio> municipiosEstado = municipioRepository.findBySgUf(ufUpper);
+        List<Municipio> municipiosEstado = municipioPort.findBySgUf(ufUpper);
         if (municipiosEstado.isEmpty()) {
-            log.warn("[RiscoEstado] Nenhum município encontrado para {}", uf);
+            log.warn("[RiscoEstado] Nenhum municipio encontrado para {}", uf);
             return null;
         }
 
-        // 2. Coordenada média do estado
         double[] coordMedia = calcularCoordenadaMedia(municipiosEstado);
-        log.info("[RiscoEstado] {} - Coordenada média: lat={}, lon={}", uf, coordMedia[0], coordMedia[1]);
+        log.info("[RiscoEstado] {} - Coordenada media: lat={}, lon={}", uf, coordMedia[0], coordMedia[1]);
 
-        // 3. Buscar clima
         ClimaAtualDTO climaAtual = climaService.buscarClimaAtual(coordMedia[0], coordMedia[1]);
         List<PrevisaoDiariaDTO> previsao16Dias = climaService.buscarPrevisao16Dias(coordMedia[0], coordMedia[1]);
+        MetricasRiscoClimatico metricas = calculadoraRiscoClimatico.extrairMetricas(climaAtual, previsao16Dias);
 
-        // 4. Calcular score
-        List<String> fatores = new ArrayList<>();
-        int score = calcularScore(climaAtual, previsao16Dias, fatores);
-        String classificacao = classificar(score);
-
-        // 5. Risco 14 dias
+        int score = calculadoraRiscoClimatico.calcularScore(metricas);
+        List<String> fatores = montarFatores(metricas);
+        String classificacao = classificacaoRiscoPolicy.classificar(score);
         List<RiscoDiarioDTO> risco14Dias = calcularRisco14Dias(previsao16Dias);
-
-        // 6. Calcular incidência histórica agregada (CACHE)
         double incidenciaHistorica = calcularIncidenciaMediaEstado(ufUpper, 2024);
 
-        log.info("[RiscoEstado] {} - Score={}, Classificação={}, Incidência={}", uf, score, classificacao, incidenciaHistorica);
+        log.info("[RiscoEstado] {} - Score={}, Classificacao={}, Incidencia={}",
+                uf, score, classificacao, incidenciaHistorica);
 
         return PrevisaoRiscoResponse.builder()
                 .coIbge(ufUpper)
-                .municipio(obterNomeEstado(ufUpper))
+                .municipio(catalogoGeograficoBrasil.nomeEstado(ufUpper))
                 .score(score)
                 .classificacao(classificacao)
                 .incidencia(incidenciaHistorica)
@@ -125,62 +115,52 @@ public class RiscoAgregadoService {
                 .build();
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // HOSPITAIS AGREGADOS (COM CACHE)
-    // ─────────────────────────────────────────────────────────────────────
-
     @Cacheable(value = "hospitais-brasil", key = "'todos'")
     public List<Estabelecimento> buscarHospitaisBrasil() {
         log.info("[HospitaisBrasil] Buscando hospitais das capitais");
 
-        // Mapa de código de município das capitais por UF
-        Map<String, String> capitaisPorUF = obterCodigosCapitais();
-
-        List<Estabelecimento> todasAsCapitais = new ArrayList<>();
-        for (String coMunicipio : capitaisPorUF.values()) {
-            List<Estabelecimento> hospitaisCapital = estabelecimentoRepository.findByMunicipio(coMunicipio);
-            todasAsCapitais.addAll(hospitaisCapital);
+        List<Estabelecimento> hospitaisCapitais = new ArrayList<>();
+        for (String uf : UFS_BRASIL) {
+            String coMunicipio = catalogoGeograficoBrasil.codigoCapitalRiscoAgregado(uf);
+            if (coMunicipio != null) {
+                hospitaisCapitais.addAll(redeAssistencialPort.buscarEstabelecimentosPorMunicipio(coMunicipio));
+            }
         }
 
-        log.info("[HospitaisBrasil] Total de hospitais das capitais: {}", todasAsCapitais.size());
-        return todasAsCapitais;
+        log.info("[HospitaisBrasil] Total de hospitais das capitais: {}", hospitaisCapitais.size());
+        return hospitaisCapitais;
     }
 
     @Cacheable(value = "hospitais-estado", key = "#uf")
     public List<Estabelecimento> buscarHospitaisEstado(String uf) {
-        log.info("[HospitaisEstado] Buscando hospitais da capital + região ({})", uf);
+        log.info("[HospitaisEstado] Buscando hospitais da capital + regiao ({})", uf);
 
-        // 1. Achar a capital do estado
-        String coCapital = obterCodigosCapitais().get(uf.toUpperCase());
+        String coCapital = catalogoGeograficoBrasil.codigoCapitalRiscoAgregado(uf);
         if (coCapital == null) {
-            log.warn("[HospitaisEstado] Capital não encontrada para {}", uf);
+            log.warn("[HospitaisEstado] Capital nao encontrada para {}", uf);
             return Collections.emptyList();
         }
 
-        // 2. Buscar coordenadas da capital
-        Municipio capital = municipioRepository.findByCoIbge(coCapital).orElse(null);
+        Municipio capital = municipioPort.findByCoIbge(coCapital).orElse(null);
         if (capital == null || capital.getNuLatitude() == null || capital.getNuLongitude() == null) {
-            log.warn("[HospitaisEstado] Coordenadas da capital não encontradas para {}", uf);
+            log.warn("[HospitaisEstado] Coordenadas da capital nao encontradas para {}", uf);
             return Collections.emptyList();
         }
 
         double latCapital = capital.getNuLatitude();
         double lonCapital = capital.getNuLongitude();
 
-        // 3. Buscar todos os hospitais do estado
-        List<Estabelecimento> hospitaisEstado = estabelecimentoRepository.findByEstado(uf.toUpperCase());
+        List<Estabelecimento> hospitaisOrdenados = redeAssistencialPort.buscarEstabelecimentosPorEstado(uf.toUpperCase()).stream()
+                .filter(hospital -> hospital.getNuLatitude() != null && hospital.getNuLongitude() != null)
+                .sorted(Comparator.comparing(hospital ->
+                        calcularDistanciaKm(latCapital, lonCapital, hospital.getNuLatitude(), hospital.getNuLongitude())))
+                .collect(Collectors.toList());
 
-        // 4. Ordenar por distância da capital
-        List<Estabelecimento> hospitaisOrdenados = hospitaisEstado.stream()
-            .filter(h -> h.getNuLatitude() != null && h.getNuLongitude() != null)
-            .sorted(Comparator.comparing(h ->
-                calcularDistanciaKm(latCapital, lonCapital, h.getNuLatitude(), h.getNuLongitude())))
-            .collect(Collectors.toList());
-
-        // 5. Preferir raio de 100 km; se vazio, retornar os mais próximos do estado
         List<Estabelecimento> dentroRaio = hospitaisOrdenados.stream()
-            .filter(h -> calcularDistanciaKm(latCapital, lonCapital, h.getNuLatitude(), h.getNuLongitude()) <= 100.0)
-            .collect(Collectors.toList());
+                .filter(hospital ->
+                        calcularDistanciaKm(latCapital, lonCapital, hospital.getNuLatitude(), hospital.getNuLongitude())
+                                <= 100.0)
+                .collect(Collectors.toList());
 
         if (!dentroRaio.isEmpty()) {
             log.info("[HospitaisEstado] {} - Total dentro de 100km: {}", uf, dentroRaio.size());
@@ -188,330 +168,168 @@ public class RiscoAgregadoService {
         }
 
         List<Estabelecimento> fallbackMaisProximos = hospitaisOrdenados.stream()
-            .limit(20)
-            .collect(Collectors.toList());
+                .limit(20)
+                .collect(Collectors.toList());
 
-        log.info("[HospitaisEstado] {} - Nenhum hospital em 100km. Retornando {} mais próximos.",
-            uf, fallbackMaisProximos.size());
+        log.info("[HospitaisEstado] {} - Nenhum hospital em 100km. Retornando {} mais proximos.",
+                uf, fallbackMaisProximos.size());
         return fallbackMaisProximos;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // INCIDÊNCIA HISTÓRICA AGREGADA (COM CACHE)
-    // ─────────────────────────────────────────────────────────────────────
-
     @Cacheable(value = "incidencia-brasil", key = "#ano")
     public double calcularIncidenciaMediaBrasil(int ano) {
-        log.debug("[IncidenciaBrasil] Calculando incidência histórica média do Brasil (ano={})", ano);
+        log.debug("[IncidenciaBrasil] Calculando incidencia historica media do Brasil (ano={})", ano);
 
-        List<Object[]> todosOsDados = casoDengueRepository.agregaCasosPorMunicipioNoAno(ano);
-
+        List<Object[]> todosOsDados = casoDenguePort.agregaCasosPorMunicipioNoAno(ano);
         if (todosOsDados == null || todosOsDados.isEmpty()) {
             log.warn("[IncidenciaBrasil] Nenhum dado encontrado para ano {}", ano);
             return 0.0;
         }
 
-        // Query otimizada retorna [coMunicipio, totalCasos].
-        // População vem da base de municípios para evitar erro de índice e manter cálculo consistente.
-        Map<String, Long> populacaoPorMunicipio = municipioRepository.findAll().stream()
+        Map<String, Long> populacaoPorMunicipio = municipioPort.findAll().stream()
                 .collect(Collectors.toMap(
                         Municipio::getCoIbge,
-                        m -> m.getPopulacao() != null ? m.getPopulacao() : 0L,
-                        (a, b) -> a
+                        municipio -> municipio.getPopulacao() != null ? municipio.getPopulacao() : 0L,
+                        (atual, ignorado) -> atual
                 ));
 
         double somaIncidencia = 0.0;
-        int count = 0;
+        int quantidadeMunicipiosValidos = 0;
 
         for (Object[] row : todosOsDados) {
-            if (row == null || row.length < 2 || row[0] == null || !(row[1] instanceof Number)) {
+            if (row == null || row.length < 2 || row[0] == null || !(row[1] instanceof Number totalCasosNumber)) {
                 continue;
             }
 
             String coMunicipio = String.valueOf(row[0]);
-            long totalCasos = ((Number) row[1]).longValue();
             long populacao = populacaoPorMunicipio.getOrDefault(coMunicipio, 0L);
-
-            if (populacao > 0) {
-                double incidencia = (double) totalCasos / populacao * 100_000;
-                somaIncidencia += incidencia;
-                count++;
+            if (populacao <= 0) {
+                continue;
             }
+
+            double incidencia = (double) totalCasosNumber.longValue() / populacao * 100_000;
+            somaIncidencia += incidencia;
+            quantidadeMunicipiosValidos++;
         }
 
-        double media = count > 0 ? somaIncidencia / count : 0.0;
-        log.debug("[IncidenciaBrasil] Incidência média = {}", media);
+        double media = quantidadeMunicipiosValidos > 0 ? somaIncidencia / quantidadeMunicipiosValidos : 0.0;
+        log.debug("[IncidenciaBrasil] Incidencia media = {}", media);
         return media;
     }
 
     @Cacheable(value = "incidencia-estado", key = "#uf + '-' + #ano")
     public double calcularIncidenciaMediaEstado(String uf, int ano) {
-        log.debug("[IncidenciaEstado] Calculando incidência histórica média de {} (ano={})", uf, ano);
+        log.debug("[IncidenciaEstado] Calculando incidencia historica media de {} (ano={})", uf, ano);
 
-        List<Object[]> dadosEstado = casoDengueRepository.agregaCasosPorEstadoNoAno(ano);
-
+        List<Object[]> dadosEstado = casoDenguePort.agregaCasosPorEstadoNoAno(ano);
         if (dadosEstado == null || dadosEstado.isEmpty()) {
             log.warn("[IncidenciaEstado] Nenhum dado encontrado para {}, ano {}", uf, ano);
             return 0.0;
         }
 
         double somaIncidencia = 0.0;
-        int count = 0;
+        int quantidadeRegistrosValidos = 0;
         String ufUpper = uf.toUpperCase();
 
         for (Object[] row : dadosEstado) {
-            // row: [sgUf, totalCasos, populacao, ...]
             String sgUf = (String) row[0];
-
-            if (ufUpper.equals(sgUf)) {
-                long totalCasos = ((Number) row[1]).longValue();
-                long populacao = ((Number) row[2]).longValue();
-
-                if (populacao > 0) {
-                    double incidencia = (double) totalCasos / populacao * 100_000;
-                    somaIncidencia += incidencia;
-                    count++;
-                }
+            if (!ufUpper.equals(sgUf)) {
+                continue;
             }
+
+            long totalCasos = ((Number) row[1]).longValue();
+            long populacao = ((Number) row[2]).longValue();
+            if (populacao <= 0) {
+                continue;
+            }
+
+            double incidencia = (double) totalCasos / populacao * 100_000;
+            somaIncidencia += incidencia;
+            quantidadeRegistrosValidos++;
         }
 
-        double media = count > 0 ? somaIncidencia / count : 0.0;
-        log.debug("[IncidenciaEstado] Incidência média = {}", media);
+        double media = quantidadeRegistrosValidos > 0 ? somaIncidencia / quantidadeRegistrosValidos : 0.0;
+        log.debug("[IncidenciaEstado] Incidencia media = {}", media);
         return media;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // HELPERS
-    // ─────────────────────────────────────────────────────────────────────
-
-    /**
-     * Calcula a coordenada (latitude, longitude) média de uma lista de municípios
-     */
     private double[] calcularCoordenadaMedia(List<Municipio> municipios) {
-        double sumLat = 0;
-        double sumLon = 0;
-        int count = 0;
+        double somaLatitudes = 0;
+        double somaLongitudes = 0;
+        int quantidadeMunicipiosComCoordenada = 0;
 
-        for (Municipio m : municipios) {
-            Double lat = m.getNuLatitude();
-            Double lon = m.getNuLongitude();
-
-            // Validar coordenadas
+        for (Municipio municipio : municipios) {
+            Double lat = municipio.getNuLatitude();
+            Double lon = municipio.getNuLongitude();
             if (lat != null && lon != null && !(lat == 0.0 && lon == 0.0)) {
-                sumLat += lat;
-                sumLon += lon;
-                count++;
+                somaLatitudes += lat;
+                somaLongitudes += lon;
+                quantidadeMunicipiosComCoordenada++;
             }
         }
 
-        if (count == 0) {
-            // Fallback: coordenada do Brasil inteiro
+        if (quantidadeMunicipiosComCoordenada == 0) {
             return new double[]{-14.235, -51.925};
         }
 
-        return new double[]{sumLat / count, sumLon / count};
+        return new double[]{
+                somaLatitudes / quantidadeMunicipiosComCoordenada,
+                somaLongitudes / quantidadeMunicipiosComCoordenada
+        };
     }
 
-    /**
-     * Calcula score baseado no clima (mesmo algoritmo de PrevisaoRiscoService)
-     */
-    private int calcularScore(ClimaAtualDTO climaAtual, List<PrevisaoDiariaDTO> previsao16Dias,
-                              List<String> fatores) {
-        int score = 0;
+    private List<String> montarFatores(MetricasRiscoClimatico metricas) {
+        List<String> fatores = new ArrayList<>();
 
-        // Temperatura atual
-        double tempAtual = climaAtual.getTemperatura() != null ? climaAtual.getTemperatura() : 0.0;
-        if (tempAtual >= 28) {
-            score += 2;
-            fatores.add("Temperatura atual ≥ 28°C (" + String.format("%.1f", tempAtual) + "°C)");
-        } else if (tempAtual >= 25) {
-            score += 1;
-            fatores.add("Temperatura atual ≥ 25°C (" + String.format("%.1f", tempAtual) + "°C)");
+        if (metricas.temperaturaAtual() >= 28) {
+            fatores.add("Temperatura atual \u2265 28\u00B0C (" + String.format("%.1f", metricas.temperaturaAtual()) + "\u00B0C)");
+        } else if (metricas.temperaturaAtual() >= 25) {
+            fatores.add("Temperatura atual \u2265 25\u00B0C (" + String.format("%.1f", metricas.temperaturaAtual()) + "\u00B0C)");
         }
 
-        // Umidade atual
-        int umidade = climaAtual.getUmidade() != null ? climaAtual.getUmidade() : 0;
-        if (umidade >= 80) {
-            score += 1;
-            fatores.add("Umidade relativa ≥ 80% (" + umidade + "%)");
+        if (metricas.umidadeAtual() >= 80) {
+            fatores.add("Umidade relativa \u2265 80% (" + metricas.umidadeAtual() + "%)");
         }
 
-        // Próximos 14 dias
-        List<PrevisaoDiariaDTO> proximos14 = previsao16Dias.stream()
-                .limit(14)
-                .collect(Collectors.toList());
-
-        // Temperatura média 14 dias
-        double tempMedia14 = proximos14.stream()
-                .mapToDouble(d -> d.getTemperaturaMaxima() != null ? d.getTemperaturaMaxima() : 0.0)
-                .average()
-                .orElse(0.0);
-
-        if (tempMedia14 >= 28) {
-            score += 2;
-            fatores.add(String.format("Temp. média 14 dias ≥ 28°C (%.1f°C)", tempMedia14));
-        } else if (tempMedia14 >= 25) {
-            score += 1;
-            fatores.add(String.format("Temp. média 14 dias ≥ 25°C (%.1f°C)", tempMedia14));
+        if (metricas.temperaturaMedia14Dias() >= 28) {
+            fatores.add(String.format("Temp. m\u00E9dia 14 dias \u2265 28\u00B0C (%.1f\u00B0C)",
+                    metricas.temperaturaMedia14Dias()));
+        } else if (metricas.temperaturaMedia14Dias() >= 25) {
+            fatores.add(String.format("Temp. m\u00E9dia 14 dias \u2265 25\u00B0C (%.1f\u00B0C)",
+                    metricas.temperaturaMedia14Dias()));
         }
 
-        // Chuva total 14 dias
-        double chuvaTotal14 = proximos14.stream()
-                .mapToDouble(d -> d.getPrecipitacaoTotal() != null ? d.getPrecipitacaoTotal() : 0.0)
-                .sum();
-
-        if (chuvaTotal14 >= 100) {
-            score += 2;
-            fatores.add(String.format("Chuva total 14 dias ≥ 100mm (%.1fmm)", chuvaTotal14));
-        } else if (chuvaTotal14 >= 50) {
-            score += 1;
-            fatores.add(String.format("Chuva total 14 dias ≥ 50mm (%.1fmm)", chuvaTotal14));
+        if (metricas.chuvaTotal14Dias() >= 100) {
+            fatores.add(String.format("Chuva total 14 dias \u2265 100mm (%.1fmm)", metricas.chuvaTotal14Dias()));
+        } else if (metricas.chuvaTotal14Dias() >= 50) {
+            fatores.add(String.format("Chuva total 14 dias \u2265 50mm (%.1fmm)", metricas.chuvaTotal14Dias()));
         }
 
-        // Probabilidade média de chuva
-        double probChuvaMedia = proximos14.stream()
-                .mapToDouble(d -> d.getProbabilidadeChuva() != null ? d.getProbabilidadeChuva() : 0)
-                .average()
-                .orElse(0.0);
-
-        if (probChuvaMedia >= 60) {
-            score += 1;
-            fatores.add(String.format("Probabilidade média de chuva ≥ 60%% (%.0f%%)", probChuvaMedia));
+        if (metricas.probabilidadeMediaChuva14Dias() >= 60) {
+            fatores.add(String.format("Probabilidade m\u00E9dia de chuva \u2265 60%% (%.0f%%)",
+                    metricas.probabilidadeMediaChuva14Dias()));
         }
 
-        return score;
+        return fatores;
     }
 
-    /**
-     * Calcula risco diário para os 14 primeiros dias
-     */
     private List<RiscoDiarioDTO> calcularRisco14Dias(List<PrevisaoDiariaDTO> previsao) {
         LocalDate hoje = LocalDate.now();
-        List<RiscoDiarioDTO> resultado = new ArrayList<>();
-
-        // Tomar apenas os primeiros 14 dias
-        int limite = Math.min(14, previsao.size());
-        for (int i = 0; i < limite; i++) {
-            PrevisaoDiariaDTO dia = previsao.get(i);
-
-            double tempMax = dia.getTemperaturaMaxima() != null ? dia.getTemperaturaMaxima() : 0.0;
-            double chuvaMm = dia.getPrecipitacaoTotal() != null ? dia.getPrecipitacaoTotal() : 0.0;
-            double probChuva = dia.getProbabilidadeChuva() != null ? dia.getProbabilidadeChuva() : 0.0;
-
-            int scoreDia = 0;
-            if (tempMax >= 28) scoreDia += 2;
-            else if (tempMax >= 25) scoreDia += 1;
-            if (chuvaMm >= 20) scoreDia += 2;
-            else if (chuvaMm >= 10) scoreDia += 1;
-            if (probChuva >= 60) scoreDia += 1;
-
-            String classificacaoDia = classificar(scoreDia);
-            LocalDate dataDia = hoje.plusDays(i);
-
-            resultado.add(RiscoDiarioDTO.builder()
-                    .data(dataDia.toString())
-                    .scoreDia(scoreDia)
-                    .classificacao(classificacaoDia)
-                    .tempMax(tempMax)
-                    .chuvaMm(chuvaMm)
-                    .probChuva(probChuva)
-                    .build());
-        }
-
-        return resultado;
+        return calculadoraRiscoClimatico.calcularRiscoDiario(
+                previsao,
+                classificacaoRiscoPolicy,
+                (indice, dia) -> hoje.plusDays(indice).toString()
+        );
     }
 
-    private String classificar(int score) {
-        if (score <= 1) {
-            return "BAIXO";
-        } else if (score <= 3) {
-            return "MODERADO";
-        } else if (score <= 5) {
-            return "ALTO";
-        } else {
-            return "EPIDEMIA";
-        }
-    }
-
-    private String obterNomeEstado(String sgUf) {
-        Map<String, String> estados = new HashMap<>();
-        estados.put("AC", "Acre");
-        estados.put("AL", "Alagoas");
-        estados.put("AP", "Amapá");
-        estados.put("AM", "Amazonas");
-        estados.put("BA", "Bahia");
-        estados.put("CE", "Ceará");
-        estados.put("DF", "Distrito Federal");
-        estados.put("ES", "Espírito Santo");
-        estados.put("GO", "Goiás");
-        estados.put("MA", "Maranhão");
-        estados.put("MT", "Mato Grosso");
-        estados.put("MS", "Mato Grosso do Sul");
-        estados.put("MG", "Minas Gerais");
-        estados.put("PA", "Pará");
-        estados.put("PB", "Paraíba");
-        estados.put("PR", "Paraná");
-        estados.put("PE", "Pernambuco");
-        estados.put("PI", "Piauí");
-        estados.put("RJ", "Rio de Janeiro");
-        estados.put("RN", "Rio Grande do Norte");
-        estados.put("RS", "Rio Grande do Sul");
-        estados.put("RO", "Rondônia");
-        estados.put("RR", "Roraima");
-        estados.put("SC", "Santa Catarina");
-        estados.put("SP", "São Paulo");
-        estados.put("SE", "Sergipe");
-        estados.put("TO", "Tocantins");
-        return estados.getOrDefault(sgUf, sgUf);
-    }
-
-    /**
-     * Retorna mapa de código de município das capitais por UF
-     * Fonte: IBGE
-     */
-    private Map<String, String> obterCodigosCapitais() {
-        Map<String, String> capitais = new HashMap<>();
-        capitais.put("AC", "1100015");  // Rio Branco
-        capitais.put("AL", "2700104");  // Maceió
-        capitais.put("AP", "1600055");  // Macapá
-        capitais.put("AM", "1302603");  // Manaus
-        capitais.put("BA", "2902404");  // Salvador
-        capitais.put("CE", "2304400");  // Fortaleza
-        capitais.put("DF", "5300108");  // Brasília
-        capitais.put("ES", "3200100");  // Vitória
-        capitais.put("GO", "5208707");  // Goiânia
-        capitais.put("MA", "2111300");  // São Luís
-        capitais.put("MT", "5103403");  // Cuiabá
-        capitais.put("MS", "5002704");  // Campo Grande
-        capitais.put("MG", "3106200");  // Belo Horizonte
-        capitais.put("PA", "1505714");  // Belém
-        capitais.put("PB", "2507002");  // João Pessoa
-        capitais.put("PR", "4106902");  // Curitiba
-        capitais.put("PE", "2611606");  // Recife
-        capitais.put("PI", "2211001");  // Teresina
-        capitais.put("RJ", "3304557");  // Rio de Janeiro
-        capitais.put("RN", "2408102");  // Natal
-        capitais.put("RS", "4314902");  // Porto Alegre
-        capitais.put("RO", "1100122");  // Porto Velho
-        capitais.put("RR", "1400100");  // Boa Vista
-        capitais.put("SC", "4205402");  // Florianópolis
-        capitais.put("SP", "3550308");  // São Paulo
-        capitais.put("SE", "2800308");  // Aracaju
-        capitais.put("TO", "2710202");  // Palmas
-        return capitais;
-    }
-
-    /**
-     * Calcula distância em km entre duas coordenadas (fórmula de Haversine)
-     */
     private double calcularDistanciaKm(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371;  // Raio da Terra em km
+        final int raioTerraKm = 6371;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;  // Distância em km
+        return raioTerraKm * c;
     }
 }

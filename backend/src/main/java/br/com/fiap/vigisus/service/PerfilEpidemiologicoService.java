@@ -1,12 +1,14 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.domain.epidemiologia.CalculadoraTendenciaEpidemiologica;
+import br.com.fiap.vigisus.domain.epidemiologia.ClassificacaoEpidemiologicaPolicy;
 import br.com.fiap.vigisus.dto.ComparativoEstadoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.SemanaDTO;
 import br.com.fiap.vigisus.exception.DadosInsuficientesException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.Municipio;
-import br.com.fiap.vigisus.repository.CasoDengueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -20,14 +22,16 @@ import java.util.stream.Collectors;
 public class PerfilEpidemiologicoService {
 
     private final MunicipioService municipioService;
-    private final CasoDengueRepository casoDengueRepository;
+    private final CasoDenguePort casoDenguePort;
     private final RankingService rankingService;
+    private final ClassificacaoEpidemiologicaPolicy classificacaoEpidemiologicaPolicy;
+    private final CalculadoraTendenciaEpidemiologica calculadoraTendenciaEpidemiologica;
 
     @Cacheable(value = "perfil-epidemiologico", key = "#coIbge + '-' + #doenca + '-' + #ano")
     public PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, int ano) {
         Municipio municipio = municipioService.buscarPorCoIbge(coIbge);
 
-        long total = casoDengueRepository
+        long total = casoDenguePort
                 .sumTotalCasosByCoMunicipioAndAno(coIbge, ano);
 
         if (total == 0) {
@@ -43,14 +47,14 @@ public class PerfilEpidemiologicoService {
         }
         double incidencia = (double) total / populacao * 100_000;
 
-        String classificacao = classificar(incidencia);
+        String classificacao = classificacaoEpidemiologicaPolicy.classificar(incidencia);
 
         String posicao = rankingService.calcularPosicaoNoEstado(coIbge, municipio.getSgUf(), doenca, ano);
         ComparativoEstadoDTO comparativoEstado = posicao != null
                 ? ComparativoEstadoDTO.builder().posicaoRankingEstado(posicao).build()
                 : null;
 
-        List<SemanaDTO> semanasAnoAtual = casoDengueRepository
+        List<SemanaDTO> semanasAnoAtual = casoDenguePort
                 .findByCoMunicipioAndAnoOrderBySemanaEpiAsc(coIbge, ano)
                 .stream()
                 .map(c -> SemanaDTO.builder()
@@ -59,7 +63,7 @@ public class PerfilEpidemiologicoService {
                         .build())
                 .collect(Collectors.toList());
 
-        String tendencia = calcularTendencia(semanasAnoAtual);
+        String tendencia = calculadoraTendenciaEpidemiologica.calcular(semanasAnoAtual);
         List<SemanaDTO> semanasAnoAnterior = buscarAnoAnterior(coIbge, ano);
         Double incidenciaMediaEstado = calcularMediaEstado(municipio.getSgUf(), ano);
 
@@ -87,44 +91,8 @@ public class PerfilEpidemiologicoService {
                 .build();
     }
 
-    private String classificar(double incidencia) {
-        if (incidencia < 50) {
-            return "BAIXO";
-        } else if (incidencia < 100) {
-            return "MODERADO";
-        } else if (incidencia <= 300) {
-            return "ALTO";
-        } else {
-            return "EPIDEMIA";
-        }
-    }
-
-    private String calcularTendencia(List<SemanaDTO> semanas) {
-        if (semanas == null || semanas.size() < 8) return "ESTAVEL";
-
-        List<SemanaDTO> comDados = semanas.stream()
-                .filter(s -> s.getCasos() > 0)
-                .collect(Collectors.toList());
-
-        if (comDados.size() < 8) return "ESTAVEL";
-
-        int n = comDados.size();
-        int somaUltimas4 = comDados.subList(n - 4, n).stream()
-                .mapToInt(SemanaDTO::getCasos).sum();
-        int somaAnteriores4 = comDados.subList(n - 8, n - 4).stream()
-                .mapToInt(SemanaDTO::getCasos).sum();
-
-        if (somaAnteriores4 == 0) return "ESTAVEL";
-
-        double variacao = (double) (somaUltimas4 - somaAnteriores4) / somaAnteriores4;
-
-        if (variacao > 0.2) return "CRESCENTE";
-        if (variacao < -0.2) return "DECRESCENTE";
-        return "ESTAVEL";
-    }
-
     private List<SemanaDTO> buscarAnoAnterior(String coMunicipio, int ano) {
-        return casoDengueRepository
+        return casoDenguePort
                 .findByCoMunicipioAndAnoOrderBySemanaEpiAsc(coMunicipio, ano - 1)
                 .stream()
                 .map(c -> SemanaDTO.builder()
@@ -140,7 +108,7 @@ public class PerfilEpidemiologicoService {
         List<Double> incidencias = new ArrayList<>();
         for (Municipio m : municipiosUf) {
             if (m.getPopulacao() == null || m.getPopulacao() == 0) continue;
-            long totalCasos = casoDengueRepository
+            long totalCasos = casoDenguePort
                     .sumTotalCasosByCoMunicipioAndAno(m.getCoIbge(), ano);
             if (totalCasos > 0) {
                 incidencias.add((double) totalCasos / m.getPopulacao() * 100_000);
