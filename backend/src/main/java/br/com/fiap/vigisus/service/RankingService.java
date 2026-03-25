@@ -21,7 +21,7 @@ public class RankingService {
     private final CasoDenguePort casoDenguePort;
     private final ClassificacaoEpidemiologicaPolicy classificacaoEpidemiologicaPolicy;
 
-    @Cacheable(value = "ranking-municipal", key = "#uf + '-' + #doenca + '-' + #ano")
+    @Cacheable(value = "ranking-municipal", key = "#uf.toUpperCase() + '-' + #doenca + '-' + #ano + '-' + #top + '-' + #ordem")
     public RankingResponse calcularRanking(String uf, String doenca, int ano, int top, String ordem) {
         int topLimitado = Math.min(top, MAX_RANKING_LIMIT);
         List<Object[]> rankingData = casoDenguePort.rankingOtimizadoPorEstado(uf.toUpperCase(), ano);

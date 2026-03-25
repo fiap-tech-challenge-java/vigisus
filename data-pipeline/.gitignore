@@ -11,3 +11,5 @@ build/
 .venv
 downloads/
 data/
+tests_tmp/
+tmp*/

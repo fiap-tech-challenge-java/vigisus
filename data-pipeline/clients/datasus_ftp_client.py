@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 _FTP_HOST = "ftp.datasus.gov.br"
 _FTP_TIMEOUT = 60
+_PROGRESS_STEP_MB = int(os.environ.get("FTP_PROGRESS_STEP_MB", "25"))
 
 PASTAS_FTP = {
     "SINAN_FINAL": "/dissemin/publicos/SINAN/DADOS/FINAIS/",
@@ -60,8 +61,8 @@ def baixar_arquivo(
     def _callback(chunk: bytes) -> None:
         total_bytes[0] += len(chunk)
         mb = total_bytes[0] // (1024 * 1024)
-        if mb > last_reported_mb[0]:
-            print(f"Baixando {arquivo}... {mb} MB")
+        if mb >= last_reported_mb[0] + _PROGRESS_STEP_MB:
+            logger.info("Baixando %s... %d MB", arquivo, mb)
             last_reported_mb[0] = mb
 
     try:

@@ -8,6 +8,7 @@ import StatusRapido from "../components/StatusRapido";
 import {
   buscarMunicipio,
   buscarRankingEstado,
+  buscarHistoricoEstado,
   buscarBrasil,
   buscarHospitaisBrasilAgregado,
   buscarHospitaisEstadoRegiao,
@@ -84,9 +85,10 @@ export default function Atual() {
 
   const [dados, setDados] = useState(null);
   const [rankingEstado, setRankingEstado] = useState([]);
+  const [rankingLoading, setRankingLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState(null);
-  const [geoState, setGeoState] = useState(hasUrlParams ? "city" : "pending");
+  const [geoState, setGeoState] = useState(hasUrlParams ? "city" : "detecting");
 
   const requestRef = useRef({ id: 0, controller: null });
 
@@ -101,6 +103,7 @@ export default function Atual() {
     setErro(null);
     setDados(null);
     setRankingEstado([]);
+    setRankingLoading(false);
 
     return { id, signal: controller.signal };
   };
@@ -116,8 +119,13 @@ export default function Atual() {
   useEffect(() => () => requestRef.current.controller?.abort(), []);
 
   useEffect(() => {
-    if (hasUrlParams && geoState !== "city") {
+    if (hasUrlParams) {
       setGeoState("city");
+      return;
+    }
+
+    if (geoState === "city") {
+      setGeoState("detecting");
     }
   }, [hasUrlParams, geoState]);
 
@@ -176,13 +184,13 @@ export default function Atual() {
   }, [hasUrlParams, setSearchParams]);
 
   useEffect(() => {
-    if (geoState === "city") {
+    if (hasUrlParams) {
       if (municipioParam) {
         carregarMunicipio(municipioParam, ufParam, doencaParam);
         return;
       }
       if (ufParam === "BR") {
-        carregarBrasil(doencaParam);
+        carregarBrasil(doencaParam, true);
         return;
       }
       if (ufParam) {
@@ -191,13 +199,18 @@ export default function Atual() {
       return;
     }
 
-    if (geoState === "brasil" && !hasUrlParams) {
-      carregarBrasil(doencaParam);
-    }
-  }, [municipioParam, ufParam, doencaParam, geoState, hasUrlParams]); // eslint-disable-line react-hooks/exhaustive-deps
+    carregarBrasil(doencaParam, false);
+  }, [municipioParam, ufParam, doencaParam, hasUrlParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const carregarMunicipio = async (municipio, uf, doenca) => {
     const { id, signal } = iniciarRequisicao();
+    let requisicaoFinalizada = false;
+    const finalizarUmaVez = () => {
+      if (!requisicaoFinalizada) {
+        requisicaoFinalizada = true;
+        finalizarRequisicao(id);
+      }
+    };
 
     try {
       const resp = await buscarMunicipio(municipio, uf, doenca, ANO_ATUAL, signal);
@@ -205,36 +218,50 @@ export default function Atual() {
         return;
       }
 
-      const ufFinal = resp?.perfil?.uf || uf;
-      const ranking = await buscarRankingEstado(ufFinal, ANO_ATUAL, doenca, signal);
-      if (!ehRequisicaoAtual(id)) {
-        return;
-      }
-
+      setRankingLoading(true);
       setDados(resp);
-      setRankingEstado(ranking?.ranking || []);
+      finalizarUmaVez();
+
+      const ufFinal = resp?.perfil?.uf || uf;
+      try {
+        const ranking = await buscarRankingEstado(ufFinal, ANO_ATUAL, doenca, signal);
+        if (ehRequisicaoAtual(id)) {
+          setRankingEstado(ranking?.ranking || []);
+        }
+      } catch (error) {
+        if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
+          setRankingEstado([]);
+        }
+      } finally {
+        if (ehRequisicaoAtual(id)) {
+          setRankingLoading(false);
+        }
+      }
     } catch (error) {
       if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
         setErro("Municipio nao encontrado. Verifique o nome e o estado.");
       }
     } finally {
-      finalizarRequisicao(id);
+      finalizarUmaVez();
     }
   };
 
-  const carregarBrasil = async (doenca) => {
+  const carregarBrasil = async (doenca, sincronizarUrl = true) => {
     const { id, signal } = iniciarRequisicao();
+    let requisicaoFinalizada = false;
+    const finalizarUmaVez = () => {
+      if (!requisicaoFinalizada) {
+        requisicaoFinalizada = true;
+        finalizarRequisicao(id);
+      }
+    };
 
     try {
-      if (searchParams.get("uf") !== "BR") {
+      if (sincronizarUrl && searchParams.get("uf") !== "BR") {
         setSearchParams({ uf: "BR", doenca }, { replace: true });
       }
 
-      const [resp, riscoAg, hospitaisBrasil] = await Promise.all([
-        buscarBrasil(doenca, ANO_ATUAL, signal),
-        buscarRiscoBrasil(signal),
-        buscarHospitaisBrasilAgregado(signal),
-      ]);
+      const resp = await buscarBrasil(doenca, ANO_ATUAL, signal);
       if (!ehRequisicaoAtual(id)) {
         return;
       }
@@ -253,27 +280,59 @@ export default function Atual() {
           ano: ANO_ATUAL,
         },
         textoIa: resp.textoIa,
-        risco: riscoAg,
-        encaminhamento: { hospitais: (hospitaisBrasil || []).map(mapHospital) },
+        risco: null,
+        encaminhamento: { hospitais: [] },
         estadosPiores: resp.estadosPiores,
         municipiosPiores: resp.municipiosPiores,
       });
       setRankingEstado(resp.estadosPiores || []);
+      finalizarUmaVez();
+
+      const [riscoResult, hospitaisResult] = await Promise.allSettled([
+        buscarRiscoBrasil(signal),
+        buscarHospitaisBrasilAgregado(signal),
+      ]);
+
+      if (!ehRequisicaoAtual(id)) {
+        return;
+      }
+
+      const riscoAtualizado = riscoResult.status === "fulfilled" ? riscoResult.value : null;
+      const hospitaisAtualizados = hospitaisResult.status === "fulfilled" ? hospitaisResult.value : [];
+
+      setDados((atual) => {
+        if (!atual) {
+          return atual;
+        }
+
+        return {
+          ...atual,
+          risco: riscoAtualizado,
+          encaminhamento: { hospitais: (hospitaisAtualizados || []).map(mapHospital) },
+        };
+      });
     } catch (error) {
       if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
         setErro("Erro ao carregar dados do Brasil.");
       }
     } finally {
-      finalizarRequisicao(id);
+      finalizarUmaVez();
     }
   };
 
   const carregarEstado = async (uf, doenca) => {
     const { id, signal } = iniciarRequisicao();
+    let requisicaoFinalizada = false;
+    const finalizarUmaVez = () => {
+      if (!requisicaoFinalizada) {
+        requisicaoFinalizada = true;
+        finalizarRequisicao(id);
+      }
+    };
 
     try {
-      const [ranking, hospitais, riscoAg] = await Promise.all([
-        buscarRankingEstado(uf, ANO_ATUAL, doenca, signal),
+      const [perfilEstado, hospitais, riscoAg] = await Promise.all([
+        buscarHistoricoEstado(uf, ANO_ATUAL, doenca, signal),
         buscarHospitaisEstadoRegiao(uf, signal),
         buscarRiscoEstado(uf, signal),
       ]);
@@ -281,41 +340,48 @@ export default function Atual() {
         return;
       }
 
-      const totalCasos = ranking?.ranking?.reduce((sum, item) => sum + (item.totalCasos || 0), 0) || 0;
-      const populacao = ranking?.ranking?.reduce((sum, item) => sum + (item.populacao || 0), 0) || 1;
-      const incidencia = populacao > 0 ? (totalCasos / populacao) * 100_000 : 0;
-
-      const classificar = (valorIncidencia) => {
-        if (valorIncidencia < 50) return "BAIXO";
-        if (valorIncidencia < 100) return "MODERADO";
-        if (valorIncidencia <= 300) return "ALTO";
-        return "EPIDEMIA";
-      };
-
       setDados({
         perfil: {
-          municipio: uf,
+          municipio: perfilEstado?.municipio || uf,
           uf,
-          total: totalCasos,
-          incidencia,
-          classificacao: classificar(incidencia),
-          tendencia: "ESTAVEL",
-          semanas: [],
-          semanasAnoAnterior: [],
+          total: perfilEstado?.total || 0,
+          incidencia: perfilEstado?.incidencia || 0,
+          classificacao: perfilEstado?.classificacao || "SEM_DADO",
+          tendencia: perfilEstado?.tendencia || "ESTAVEL",
+          semanas: perfilEstado?.semanas || [],
+          semanasAnoAnterior: perfilEstado?.semanasAnoAnterior || [],
           doenca,
           ano: ANO_ATUAL,
         },
-        textoIa: `Estado ${uf} registrou ${totalCasos} casos de ${doenca} em ${ANO_ATUAL}, com incidencia de ${incidencia.toFixed(1)} por 100 mil habitantes.`,
+        textoIa:
+          perfilEstado?.textoIa ||
+          `Estado ${uf} registrou ${perfilEstado?.total || 0} casos de ${doenca} em ${ANO_ATUAL}.`,
         risco: riscoAg,
         encaminhamento: { hospitais: (hospitais || []).map(mapHospital) },
       });
-      setRankingEstado(ranking?.ranking || []);
+      setRankingLoading(true);
+      finalizarUmaVez();
+
+      try {
+        const ranking = await buscarRankingEstado(uf, ANO_ATUAL, doenca, signal);
+        if (ehRequisicaoAtual(id)) {
+          setRankingEstado(ranking?.ranking || []);
+        }
+      } catch (error) {
+        if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
+          setRankingEstado([]);
+        }
+      } finally {
+        if (ehRequisicaoAtual(id)) {
+          setRankingLoading(false);
+        }
+      }
     } catch (error) {
       if (!foiRequisicaoCancelada(error) && ehRequisicaoAtual(id)) {
         setErro("Estado nao encontrado. Verifique.");
       }
     } finally {
-      finalizarRequisicao(id);
+      finalizarUmaVez();
     }
   };
 
@@ -346,33 +412,6 @@ export default function Atual() {
     return null;
   };
 
-  if (geoState === "pending") {
-    return (
-      <div className="min-h-screen vigi-page">
-        <TopNav loading />
-        <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center h-80 gap-3">
-          <p className="text-gray-400 text-sm animate-pulse" aria-live="polite">
-            Detectando sua localizacao...
-          </p>
-          <p className="text-xs text-gray-300">Voce tambem pode pesquisar acima.</p>
-        </main>
-      </div>
-    );
-  }
-
-  if (geoState === "brasil" && loading) {
-    return (
-      <div className="min-h-screen vigi-page">
-        <TopNav loading />
-        <main id="main-content" tabIndex={-1} className="flex flex-col items-center justify-center h-[70vh] gap-5">
-          <p className="text-gray-400 text-sm animate-pulse" aria-live="polite">
-            Carregando dados do Brasil...
-          </p>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen vigi-page">
       <TopNav loading={loading} />
@@ -395,6 +434,14 @@ export default function Atual() {
             Atual e Previsao
           </span>
         </div>
+
+        {!hasUrlParams && geoState === "detecting" && (
+          <div className="max-w-6xl mx-auto px-6 pt-3" aria-live="polite">
+            <p className="text-xs text-gray-500">
+              Detectando sua localizacao em segundo plano. Exibindo Brasil enquanto isso.
+            </p>
+          </div>
+        )}
 
         {(() => {
           const fallback = renderizarSkeletonOuErro(2);
@@ -472,6 +519,9 @@ export default function Atual() {
           <section aria-label="Mapa regional">
             <SectionTitle icone="Mapa" titulo="Distribuicao regional" />
             {(() => {
+              if (rankingLoading && !rankingEstado.length) {
+                return <SectionSkeleton linhas={4} />;
+              }
               const fallback = renderizarSkeletonOuErro(4);
               if (fallback) {
                 return fallback;
@@ -529,4 +579,3 @@ export default function Atual() {
     </div>
   );
 }
-

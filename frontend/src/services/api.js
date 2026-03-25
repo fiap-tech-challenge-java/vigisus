@@ -90,6 +90,13 @@ export const buscarBrasil = async (doenca = "dengue", ano = null, signal) => {
   return res.data;
 };
 
+export const buscarDashboardBrasil = async (doenca = "dengue", ano = null, signal) => {
+  const params = new URLSearchParams({ doenca });
+  if (ano) params.append("ano", ano);
+  const res = await api.get(`/api/brasil/dashboard?${params}`, withSignal(signal));
+  return res.data;
+};
+
 export const buscarRiscoBrasil = async (signal) => {
   try {
     const res = await api.get(

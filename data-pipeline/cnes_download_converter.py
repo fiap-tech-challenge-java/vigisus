@@ -47,25 +47,31 @@ def convert_csv_to_json(zip_path: str, output_dir: str) -> str:
     """Extrai o primeiro CSV do ZIP e converte para JSON."""
     os.makedirs(output_dir, exist_ok=True)
 
+    base_name = os.path.splitext(os.path.basename(zip_path))[0]
+    json_path = os.path.join(output_dir, f"{base_name}.json")
+
     with zipfile.ZipFile(zip_path, "r") as zf:
         csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
         if not csv_names:
             raise ValueError(f"Nenhum CSV encontrado em {zip_path}")
 
         csv_name = csv_names[0]
-        with zf.open(csv_name) as csv_file:
+        with zf.open(csv_name) as csv_file, open(json_path, "w", encoding="utf-8") as jf:
             reader = csv.DictReader(
                 (line.decode("latin-1") for line in csv_file),
                 delimiter=";",
             )
-            records = list(reader)
 
-    base_name = os.path.splitext(os.path.basename(zip_path))[0]
-    json_path = os.path.join(output_dir, f"{base_name}.json")
-    with open(json_path, "w", encoding="utf-8") as jf:
-        json.dump(records, jf, ensure_ascii=False, indent=2)
+            count = 0
+            jf.write("[\n")
+            for row in reader:
+                if count > 0:
+                    jf.write(",\n")
+                json.dump(row, jf, ensure_ascii=False)
+                count += 1
+            jf.write("\n]\n")
 
-    logger.info("Convertido para JSON: %s (%d registros)", json_path, len(records))
+    logger.info("Convertido para JSON: %s (%d registros)", json_path, count)
     return json_path
 
 
