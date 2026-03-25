@@ -1,8 +1,9 @@
 """
 clients/datasus_ftp_client.py
-Cliente FTP para download de arquivos públicos do DATASUS.
-Acessa o servidor ftp.datasus.gov.br com login anônimo (sem senha).
+Cliente FTP para download de arquivos publicos do DATASUS.
 """
+
+from __future__ import annotations
 
 import ftplib
 import logging
@@ -14,29 +15,22 @@ _FTP_HOST = "ftp.datasus.gov.br"
 _FTP_TIMEOUT = 60
 
 PASTAS_FTP = {
-    "SINAN_FINAL":  "/dissemin/publicos/SINAN/DADOS/FINAIS/",
+    "SINAN_FINAL": "/dissemin/publicos/SINAN/DADOS/FINAIS/",
     "SINAN_PRELIM": "/dissemin/publicos/SINAN/DADOS/PRELIM/",
-    "CNES_ST":      "/dissemin/publicos/CNES/200508_/Dados/ST/",
-    "CNES_LT":      "/dissemin/publicos/CNES/200508_/Dados/LT/",
-    "CNES_SR":      "/dissemin/publicos/CNES/200508_/Dados/SR/",
+    "CNES_ST": "/dissemin/publicos/CNES/200508_/Dados/ST/",
+    "CNES_LT": "/dissemin/publicos/CNES/200508_/Dados/LT/",
+    "CNES_SR": "/dissemin/publicos/CNES/200508_/Dados/SR/",
 }
 
 
 def _connect() -> ftplib.FTP:
-    """Abre conexão FTP anônima com o servidor DATASUS."""
     ftp = ftplib.FTP(timeout=_FTP_TIMEOUT)
     ftp.connect(_FTP_HOST)
-    ftp.login()  # anônimo, sem senha
+    ftp.login()  # login anonimo
     return ftp
 
 
 def listar_arquivos(pasta: str) -> list[str]:
-    """
-    Lista os arquivos disponíveis em uma pasta do FTP DATASUS.
-
-    :param pasta: Caminho remoto (ex.: PASTAS_FTP['SINAN_FINAL']).
-    :return: Lista de nomes de arquivo.
-    """
     try:
         with _connect() as ftp:
             ftp.cwd(pasta)
@@ -53,22 +47,11 @@ def baixar_arquivo(
     arquivo: str,
     destino_dir: str = "./downloads",
 ) -> str | None:
-    """
-    Baixa um arquivo do FTP DATASUS para o diretório local.
-
-    Pula o download se o arquivo já existir localmente.
-    Exibe progresso a cada MB baixado.
-
-    :param pasta: Caminho remoto da pasta.
-    :param arquivo: Nome do arquivo no FTP.
-    :param destino_dir: Diretório local de destino.
-    :return: Caminho completo do arquivo baixado ou None em caso de erro.
-    """
     os.makedirs(destino_dir, exist_ok=True)
     destino_path = os.path.join(destino_dir, arquivo)
 
     if os.path.exists(destino_path):
-        logger.info("Arquivo já existe, pulando: %s", destino_path)
+        logger.info("Arquivo ja existe, pulando: %s", destino_path)
         return destino_path
 
     total_bytes = [0]
@@ -91,7 +74,7 @@ def baixar_arquivo(
 
                 ftp.retrbinary(f"RETR {arquivo}", _write)
         logger.info(
-            "Download concluído: %s (%.2f MB)",
+            "Download concluido: %s (%.2f MB)",
             destino_path,
             total_bytes[0] / (1024 * 1024),
         )
@@ -108,50 +91,46 @@ def baixar_sinan_dengue(
     destino_dir: str = "./downloads",
 ) -> list[str]:
     """
-    Baixa os arquivos SINAN de dengue para os anos informados.
+    Baixa arquivos SINAN para os anos informados.
 
-    Tenta primeiro a pasta de arquivos finais e, se não encontrar, tenta
-    a pasta de arquivos preliminares.
-
-    :param anos: Lista de anos (ex.: [2022, 2023, 2024]).
-    :param destino_dir: Diretório local de destino.
-    :return: Lista de caminhos dos arquivos baixados com sucesso.
+    Otimizacao: listagem de cada pasta e cacheada para evitar conexoes repetidas.
     """
-    baixados = []
+    baixados: list[str] = []
+    cache_listagem: dict[str, dict[str, str]] = {}
+
+    def _arquivos_normalizados(pasta: str) -> dict[str, str]:
+        if pasta not in cache_listagem:
+            arquivos = listar_arquivos(pasta)
+            cache_listagem[pasta] = {nome.upper(): nome for nome in arquivos}
+        return cache_listagem[pasta]
 
     for ano in anos:
-        aa = str(ano)[2:]  # ex.: 2024 → "24"
+        aa = str(ano)[2:]
         nome_arquivo = f"DENGBR{aa}.dbc"
+        nome_arquivo_upper = nome_arquivo.upper()
 
-        # Tenta pasta FINAIS
         pasta = PASTAS_FTP["SINAN_FINAL"]
-        disponiveis = listar_arquivos(pasta)
-        if nome_arquivo in disponiveis or nome_arquivo.upper() in [a.upper() for a in disponiveis]:
-            caminho = baixar_arquivo(pasta, nome_arquivo, destino_dir)
+        disponiveis = _arquivos_normalizados(pasta)
+        if nome_arquivo_upper in disponiveis:
+            caminho = baixar_arquivo(pasta, disponiveis[nome_arquivo_upper], destino_dir)
             if caminho:
                 baixados.append(caminho)
                 continue
 
-        # Fallback: pasta PRELIM
-        logger.info("%s não encontrado em FINAIS, tentando PRELIM...", nome_arquivo)
+        logger.info("%s nao encontrado em FINAIS, tentando PRELIM...", nome_arquivo)
         pasta = PASTAS_FTP["SINAN_PRELIM"]
-        disponiveis = listar_arquivos(pasta)
-        if nome_arquivo in disponiveis or nome_arquivo.upper() in [a.upper() for a in disponiveis]:
-            caminho = baixar_arquivo(pasta, nome_arquivo, destino_dir)
+        disponiveis = _arquivos_normalizados(pasta)
+        if nome_arquivo_upper in disponiveis:
+            caminho = baixar_arquivo(pasta, disponiveis[nome_arquivo_upper], destino_dir)
             if caminho:
                 baixados.append(caminho)
         else:
-            logger.warning("Arquivo %s não encontrado em FINAIS nem PRELIM", nome_arquivo)
+            logger.warning("Arquivo %s nao encontrado em FINAIS nem PRELIM", nome_arquivo)
 
     return baixados
 
 
 def _competencia_anterior(competencia: str) -> str:
-    """
-    Retorna a competência anterior no formato AAMM.
-
-    Ex.: '2501' → '2412', '2503' → '2502'.
-    """
     aa = int(competencia[:2])
     mm = int(competencia[2:])
     if mm == 1:
@@ -165,21 +144,9 @@ def _competencia_anterior(competencia: str) -> str:
 def baixar_cnes(
     uf: str,
     competencia: str,
-    tipos: list[str] = None,
+    tipos: list[str] | None = None,
     destino_dir: str = "./downloads",
 ) -> dict[str, str]:
-    """
-    Baixa arquivos CNES do FTP para uma UF e competência.
-
-    Se o arquivo da competência informada não existir no FTP,
-    tenta automaticamente a competência anterior (AAMM - 1).
-
-    :param uf: Sigla da UF (ex.: 'MG').
-    :param competencia: Competência no formato AAMM (ex.: '2502').
-    :param tipos: Lista de tipos CNES (padrão ['ST', 'LT', 'SR']).
-    :param destino_dir: Diretório local de destino.
-    :return: Dicionário { tipo: caminho_local }.
-    """
     if tipos is None:
         tipos = ["ST", "LT", "SR"]
 
@@ -193,26 +160,26 @@ def baixar_cnes(
 
         pasta = PASTAS_FTP[chave_pasta]
         disponiveis = listar_arquivos(pasta)
-        nomes_upper = [a.upper() for a in disponiveis]
+        nomes_upper = {a.upper(): a for a in disponiveis}
 
-        # Tenta competência informada
         arquivo = f"{tipo}{uf.upper()}{competencia}.dbc"
-        if arquivo.upper() in nomes_upper:
-            caminho = baixar_arquivo(pasta, arquivo, destino_dir)
+        arquivo_upper = arquivo.upper()
+        if arquivo_upper in nomes_upper:
+            caminho = baixar_arquivo(pasta, nomes_upper[arquivo_upper], destino_dir)
             if caminho:
                 resultado[tipo] = caminho
                 continue
 
-        # Tenta competência anterior
         comp_ant = _competencia_anterior(competencia)
         arquivo_ant = f"{tipo}{uf.upper()}{comp_ant}.dbc"
+        arquivo_ant_upper = arquivo_ant.upper()
         logger.info(
-            "%s não encontrado, tentando competência anterior: %s",
+            "%s nao encontrado, tentando competencia anterior: %s",
             arquivo,
             arquivo_ant,
         )
-        if arquivo_ant.upper() in nomes_upper:
-            caminho = baixar_arquivo(pasta, arquivo_ant, destino_dir)
+        if arquivo_ant_upper in nomes_upper:
+            caminho = baixar_arquivo(pasta, nomes_upper[arquivo_ant_upper], destino_dir)
             if caminho:
                 resultado[tipo] = caminho
         else:

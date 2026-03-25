@@ -1,40 +1,67 @@
 """
 requests_config.py
-Configuração globalizada para requisições HTTP com SSL desabilitado.
-Fornece uma sessão pré-configurada para ignorar verificação de certificados.
+Factory de sessao HTTP padronizada para o pipeline.
+
+Melhorias:
+- retry automatico para erros transientes (429/5xx);
+- pool de conexoes reutilizavel;
+- SSL verificavel por variavel de ambiente.
 """
 
-import urllib3
+from __future__ import annotations
+
+import os
+
 import requests
+import urllib3
 from requests.adapters import HTTPAdapter
-from urllib3.util.ssl_ import create_urllib3_context
+from urllib3.util.retry import Retry
 
-# Desabilitar avisos de certificado não verificado
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-
-class SSLAdapter(HTTPAdapter):
-    """Adapter HTTP que ignora completamente a verificação de certificado SSL."""
-    
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context()
-        context.check_hostname = False
-        context.verify_mode = urllib3.util.ssl_.ssl.CERT_NONE
-        kwargs['ssl_context'] = context
-        return super().init_poolmanager(*args, **kwargs)
+DEFAULT_RETRY_TOTAL = int(os.environ.get("HTTP_RETRY_TOTAL", "3"))
+DEFAULT_RETRY_BACKOFF = float(os.environ.get("HTTP_RETRY_BACKOFF", "0.5"))
+VERIFY_SSL = os.environ.get("REQUESTS_VERIFY_SSL", "true").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+}
 
 
-def get_session_with_ssl_disabled() -> requests.Session:
+def _build_retry_policy() -> Retry:
+    return Retry(
+        total=DEFAULT_RETRY_TOTAL,
+        connect=DEFAULT_RETRY_TOTAL,
+        read=DEFAULT_RETRY_TOTAL,
+        status=DEFAULT_RETRY_TOTAL,
+        backoff_factor=DEFAULT_RETRY_BACKOFF,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=frozenset({"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS"}),
+        raise_on_status=False,
+    )
+
+
+def create_session(verify_ssl: bool | None = None) -> requests.Session:
     """
-    Retorna uma sessão de requests com verificação SSL completamente desabilitada.
-    
-    :return: requests.Session configurada sem verificação de certificado.
+    Cria uma requests.Session com retry/pool configurados.
+
+    :param verify_ssl: sobrescreve a configuracao global de SSL.
     """
+    should_verify_ssl = VERIFY_SSL if verify_ssl is None else verify_ssl
     session = requests.Session()
-    session.mount('https://', SSLAdapter())
-    session.mount('http://', HTTPAdapter())
+
+    adapter = HTTPAdapter(
+        max_retries=_build_retry_policy(),
+        pool_connections=20,
+        pool_maxsize=20,
+    )
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    session.verify = should_verify_ssl
+
+    if not should_verify_ssl:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     return session
 
 
-# Sessão global pré-configurada
-session = get_session_with_ssl_disabled()
+# Sessao global para uso nos clientes.
+session = create_session()
