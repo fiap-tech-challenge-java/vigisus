@@ -27,7 +27,7 @@ export default function TabelaRanking({ ranking = [] }) {
   const temMais = ordenado.length > LIMITE_PADRAO;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mx-6 max-w-6xl md:mx-auto">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mx-6 max-w-6xl md:mx-auto vigi-focus-card" tabIndex={0}>
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>

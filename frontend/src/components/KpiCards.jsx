@@ -10,7 +10,12 @@ const contextoIncidencia = (inc, classif) => {
 
 function Card({ titulo, valor, sub, cor, extraClasses = "", children }) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm p-5 flex flex-col gap-1 ${extraClasses}`}>
+    <div
+      className={`bg-white rounded-xl shadow-sm p-5 flex flex-col gap-1 vigi-focus-card ${extraClasses}`}
+      tabIndex={0}
+      role="group"
+      aria-label={`Card de indicador: ${titulo}`}
+    >
       <p className="text-xs text-gray-400 uppercase tracking-wider">{titulo}</p>
       <p className="text-3xl font-black text-gray-800">{valor}</p>
       {sub && <p className="text-xs text-gray-400">{sub}</p>}

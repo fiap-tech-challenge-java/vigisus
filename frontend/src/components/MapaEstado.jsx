@@ -57,6 +57,21 @@ const normalizarNome = (valor) =>
     .toLowerCase()
     .trim();
 
+const formatarListaRegioes = (lista) => {
+  if (!lista?.length) {
+    return "Nenhuma regiao com classificacao nesse nivel.";
+  }
+
+  const limite = 8;
+  const exibidos = lista.slice(0, limite);
+  const restante = lista.length - exibidos.length;
+
+  if (restante > 0) {
+    return `${exibidos.join(", ")} +${restante} regioes`;
+  }
+  return exibidos.join(", ");
+};
+
 export default function MapaEstado({
   uf = "MG",
   nivel = "estado",
@@ -209,6 +224,49 @@ export default function MapaEstado({
     return contagem;
   }, [classificacaoMap]);
 
+  const regioesPorNivel = useMemo(() => {
+    const agrupado = {
+      EPIDEMIA: [],
+      ALTO: [],
+      MODERADO: [],
+      BAIXO: [],
+      SEM_DADO: [],
+    };
+
+    (ranking || []).forEach((item) => {
+      if (!item) {
+        return;
+      }
+
+      const classificacaoRaw =
+        item.classificacao ??
+        item.classification ??
+        item.status ??
+        fallbackClassificacao;
+      const classificacao = COR_RISCO[classificacaoRaw]
+        ? classificacaoRaw
+        : fallbackClassificacao;
+
+      const nome = isBrasil
+        ? String(item.sgUf ?? item.uf ?? item.sigla ?? "").toUpperCase()
+        : String(item.municipio ?? item.nome ?? item.nomeMunicipio ?? "").trim();
+
+      if (!nome) {
+        return;
+      }
+
+      if (!agrupado[classificacao].includes(nome)) {
+        agrupado[classificacao].push(nome);
+      }
+    });
+
+    NIVEIS.forEach((nivelItem) => {
+      agrupado[nivelItem].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    });
+
+    return agrupado;
+  }, [ranking, isBrasil, fallbackClassificacao]);
+
   const estilizarFeature = (feature) => {
     if (!feature?.properties) {
       return {
@@ -326,7 +384,7 @@ export default function MapaEstado({
         </MapContainer>
       </div>
 
-      <section className="mt-4 vigi-card p-4" aria-label="Legenda do mapa epidemiologico">
+      <section className="mt-4 vigi-card p-4 vigi-focus-card" aria-label="Legenda do mapa epidemiologico" tabIndex={0}>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Legenda do mapa</h3>
         <ul className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {NIVEIS.map((nivelItem) => (
@@ -346,13 +404,18 @@ export default function MapaEstado({
         </p>
       </section>
 
-      <section className="mt-3 vigi-card p-4" aria-label="Resumo textual do mapa">
+      <section className="mt-3 vigi-card p-4 vigi-focus-card" aria-label="Resumo textual do mapa" tabIndex={0}>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Resumo textual para acessibilidade</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           {NIVEIS.map((nivelItem) => (
-            <div key={nivelItem} className="px-3 py-2 rounded-md bg-gray-50 border border-gray-200">
+            <div
+              key={nivelItem}
+              className="px-3 py-2 rounded-md bg-gray-50 border border-gray-200 vigi-focus-card"
+              tabIndex={0}
+            >
               <p className="font-semibold text-gray-700">{LABEL_NIVEL[nivelItem]}</p>
               <p className="text-gray-500">{contagemPorNivel[nivelItem] || 0} regioes</p>
+              <p className="text-gray-500 mt-1">{formatarListaRegioes(regioesPorNivel[nivelItem])}</p>
             </div>
           ))}
         </div>

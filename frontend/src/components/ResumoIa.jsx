@@ -22,7 +22,7 @@ export default function ResumoIa({ textoIa, perfil, ranking = [], risco = null }
   ];
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 mx-6 max-w-6xl md:mx-auto mt-4 mb-8">
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 mx-6 max-w-6xl md:mx-auto mt-4 mb-8 vigi-focus-card" tabIndex={0}>
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
         Resumo operacional ampliado
       </p>

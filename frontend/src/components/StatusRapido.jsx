@@ -24,11 +24,11 @@ export default function StatusRapido({ perfil, risco }) {
   const corRisco = getCor(risco?.classificacao);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm mx-6 max-w-6xl md:mx-auto mt-2">
+    <div className="bg-white rounded-xl shadow-sm mx-6 max-w-6xl md:mx-auto mt-2 vigi-focus-card" tabIndex={0}>
       <div className="grid grid-cols-3 divide-x divide-gray-100">
 
         {/* Incidência */}
-        <div className="flex flex-col gap-0.5 px-6 py-4">
+        <div className="flex flex-col gap-0.5 px-6 py-4 vigi-focus-card" tabIndex={0} role="group" aria-label="Card de incidencia">
           <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
             Incidência
           </p>
@@ -42,7 +42,7 @@ export default function StatusRapido({ perfil, risco }) {
         </div>
 
         {/* Tendência */}
-        <div className="flex flex-col gap-0.5 px-6 py-4">
+        <div className="flex flex-col gap-0.5 px-6 py-4 vigi-focus-card" tabIndex={0} role="group" aria-label="Card de tendencia">
           <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
             Tendência
           </p>
@@ -56,7 +56,7 @@ export default function StatusRapido({ perfil, risco }) {
         </div>
 
         {/* Risco futuro */}
-        <div className="flex flex-col gap-0.5 px-6 py-4">
+        <div className="flex flex-col gap-0.5 px-6 py-4 vigi-focus-card" tabIndex={0} role="group" aria-label="Card de risco futuro">
           <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
             Risco futuro
           </p>

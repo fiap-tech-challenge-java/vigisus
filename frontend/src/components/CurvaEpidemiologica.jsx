@@ -76,7 +76,7 @@ export default function CurvaEpidemiologica({ perfil }) {
   const temComparativo = perfil?.semanasAnoAnterior?.length > 0;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 mx-6 max-w-6xl md:mx-auto">
+    <div className="bg-white rounded-xl shadow-sm p-6 mx-6 max-w-6xl md:mx-auto vigi-focus-card" tabIndex={0}>
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-sm font-semibold text-gray-700">

@@ -102,7 +102,7 @@ export default function OQueFazerAgora({ perfil, textoIa, ranking = [], risco = 
 
   return (
     <div>
-      <div className={`rounded-xl border ${cor.borda} bg-white shadow-sm overflow-hidden`}>
+      <div className={`rounded-xl border ${cor.borda} bg-white shadow-sm overflow-hidden vigi-focus-card`} tabIndex={0}>
         <div
           className="flex items-center justify-between px-5 py-4 border-b border-gray-100"
           aria-label={`O que fazer agora - nivel ${nivel}`}
@@ -123,7 +123,13 @@ export default function OQueFazerAgora({ perfil, textoIa, ranking = [], risco = 
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
           {PERSONAS.map((persona) => (
-            <div key={persona.key} className={`p-4 ${persona.fundo}`}>
+            <div
+              key={persona.key}
+              className={`p-4 ${persona.fundo} vigi-focus-card`}
+              tabIndex={0}
+              role="group"
+              aria-label={`Card de orientacoes para ${persona.titulo}`}
+            >
               <p className={`text-sm font-bold mb-2 ${persona.tituloCor}`}>
                 {persona.icone} {persona.titulo}
               </p>

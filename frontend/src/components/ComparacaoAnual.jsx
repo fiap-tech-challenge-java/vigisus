@@ -119,7 +119,7 @@ export default function ComparacaoAnual({
   if (escopo === "estado" && !uf) return null;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mx-6 max-w-6xl md:mx-auto">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mx-6 max-w-6xl md:mx-auto vigi-focus-card" tabIndex={0}>
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
         Comparacao anual
       </p>

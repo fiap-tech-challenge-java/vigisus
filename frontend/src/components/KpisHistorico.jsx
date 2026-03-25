@@ -48,7 +48,7 @@ export default function KpisHistorico({ perfil }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 max-w-6xl mx-auto">
       {/* Card 1 — Total do ano */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col gap-2">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col gap-2 vigi-focus-card" tabIndex={0} role="group" aria-label="Card de total anual">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Total do ano
         </p>
@@ -61,7 +61,7 @@ export default function KpisHistorico({ perfil }) {
       </div>
 
       {/* Card 2 — Pico registrado */}
-      <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 flex flex-col gap-2">
+      <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 flex flex-col gap-2 vigi-focus-card" tabIndex={0} role="group" aria-label="Card de pico anual">
         <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">
           Pico registrado
         </p>

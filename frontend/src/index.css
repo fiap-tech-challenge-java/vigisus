@@ -71,6 +71,19 @@ body {
   border-radius: 0.75rem;
 }
 
+.vigi-focus-card {
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.vigi-focus-card:hover {
+  transform: translateY(-1px);
+}
+
+.vigi-focus-card:focus-visible {
+  box-shadow: 0 0 0 3px var(--vigi-focus);
+}
+
 .vigi-button-primary {
   background-color: var(--vigi-brand);
   color: #ffffff;
@@ -202,6 +215,23 @@ html[data-theme="dark"] .text-blue-900 {
   color: #93c5fd !important;
 }
 
+html[data-theme="dark"] .vigi-page :where(
+  p,
+  span,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  li,
+  td,
+  th,
+  label
+) {
+  color: #ffffff !important;
+}
+
 html[data-contrast="high"] .vigi-card,
 html[data-contrast="high"] button,
 html[data-contrast="high"] input,
@@ -238,6 +268,23 @@ html[data-contrast="high"] .text-blue-600,
 html[data-contrast="high"] .text-red-700,
 html[data-contrast="high"] .text-red-600,
 html[data-contrast="high"] .text-white {
+  color: #ffffff !important;
+}
+
+html[data-contrast="high"] .vigi-page :where(
+  p,
+  span,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  li,
+  td,
+  th,
+  label
+) {
   color: #ffffff !important;
 }
 

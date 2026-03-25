@@ -65,7 +65,7 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
 
   return (
     <div className="mx-6 max-w-6xl md:mx-auto mt-4 space-y-4">
-      <section className="vigi-card p-4" aria-label="Legenda do mapa de hospitais">
+      <section className="vigi-card p-4 vigi-focus-card" aria-label="Legenda do mapa de hospitais" tabIndex={0}>
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Legenda do mapa de hospitais</h3>
         <ul className="flex flex-wrap gap-4 text-xs text-gray-600">
           <li className="flex items-center gap-2">
@@ -137,7 +137,7 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
 
         <div className="w-full md:w-80 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: 380 }}>
           {hospitais.length === 0 ? (
-            <div className="bg-white rounded-xl shadow p-4 text-sm text-gray-400 text-center">
+            <div className="bg-white rounded-xl shadow p-4 text-sm text-gray-400 text-center vigi-focus-card" tabIndex={0}>
               Nenhum hospital encontrado para esta regiao
             </div>
           ) : (
@@ -146,8 +146,9 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
                 key={`${hospital.nome || "hospital-card"}-${hospital.nuLatitude}-${hospital.nuLongitude}-${index}`}
                 className={`bg-white rounded-xl shadow p-4 border-l-4 ${
                   index === 0 ? "border-red-500" : "border-gray-200"
-                }`}
+                } vigi-focus-card`}
                 aria-label={`Hospital ${hospital.nome || "sem nome"}`}
+                tabIndex={0}
               >
                 <div className="flex items-start justify-between mb-1">
                   <p className="text-sm font-semibold text-gray-800 leading-tight">
@@ -180,7 +181,7 @@ export default function MapaHospitais({ perfil, encaminhamento }) {
         </div>
       </div>
 
-      <section className="vigi-card p-4" aria-label="Tabela acessivel de hospitais">
+      <section className="vigi-card p-4 vigi-focus-card" aria-label="Tabela acessivel de hospitais" tabIndex={0}>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Tabela acessivel de hospitais</h3>
         {hospitais.length === 0 ? (
           <p className="text-sm text-gray-500">Sem hospitais disponiveis para exibir.</p>
