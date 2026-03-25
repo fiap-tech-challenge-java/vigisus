@@ -4,8 +4,10 @@ import br.com.fiap.vigisus.application.encaminhamento.SelecionadorHospitaisProxi
 import br.com.fiap.vigisus.application.port.CasoDenguePort;
 import br.com.fiap.vigisus.application.port.RedeAssistencialPort;
 import br.com.fiap.vigisus.domain.encaminhamento.ClassificacaoPressaoSusPolicy;
+import br.com.fiap.vigisus.domain.encaminhamento.TipoLeito;
 import br.com.fiap.vigisus.domain.geografia.CalculadoraDistanciaGeografica;
 import br.com.fiap.vigisus.domain.geografia.CatalogoGeograficoBrasil;
+import br.com.fiap.vigisus.domain.geografia.CoIbge;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.EncaminhamentoResponse.HospitalDTO;
 import br.com.fiap.vigisus.model.CasoDengue;
@@ -44,7 +46,9 @@ public class EncaminhamentoService {
     private final SelecionadorHospitaisProximos selecionadorHospitaisProximos;
 
     public EncaminhamentoResponse buscarHospitais(String coIbge, String tpLeito, int minLeitosSus) {
-        Municipio origem = municipioService.buscarPorCoIbge(coIbge);
+        CoIbge codigoMunicipio = CoIbge.of(coIbge);
+        TipoLeito tipoLeito = TipoLeito.of(tpLeito);
+        Municipio origem = municipioService.buscarPorCoIbge(codigoMunicipio.value());
 
         double lat = origem.getNuLatitude();
         double lon = origem.getNuLongitude();
@@ -53,20 +57,20 @@ public class EncaminhamentoService {
         List<HospitalDTO> resultados = new ArrayList<>();
 
         for (int raio : raiosKm) {
-            resultados = buscarNoRaio(lat, lon, tpLeito, minLeitosSus, raio);
+            resultados = buscarNoRaio(lat, lon, tipoLeito, minLeitosSus, raio);
             if (!resultados.isEmpty()) {
                 break;
             }
         }
 
         int totalLeitosSus = resultados.stream().mapToInt(HospitalDTO::getQtLeitosSus).sum();
-        String pressaoSus = calcularPressaoSus(coIbge, totalLeitosSus);
+        String pressaoSus = calcularPressaoSus(codigoMunicipio, totalLeitosSus);
 
-        return buildResponse(coIbge, origem.getNoMunicipio(), tpLeito, resultados, pressaoSus);
+        return buildResponse(codigoMunicipio.value(), origem.getNoMunicipio(), tipoLeito.codigo(), resultados, pressaoSus);
     }
 
-    private List<HospitalDTO> buscarNoRaio(double lat, double lon, String tpLeito, int minLeitosSus, int raioKm) {
-        List<Leito> leitos = redeAssistencialPort.buscarLeitosPorTipoComMinimoSus(tpLeito, minLeitosSus);
+    private List<HospitalDTO> buscarNoRaio(double lat, double lon, TipoLeito tipoLeito, int minLeitosSus, int raioKm) {
+        List<Leito> leitos = redeAssistencialPort.buscarLeitosPorTipoComMinimoSus(tipoLeito.codigo(), minLeitosSus);
         if (leitos.isEmpty()) {
             return List.of();
         }
@@ -108,24 +112,16 @@ public class EncaminhamentoService {
     }
 
     public String resolverTpLeito(String gravidade) {
-        if (gravidade == null) {
-            return "74";
-        }
-
-        String valor = gravidade.strip().toLowerCase();
-        if (valor.equals("grave") || valor.equals("critica") || valor.equals("cr\u00edtica")) {
-            return "81";
-        }
-        return "74";
+        return TipoLeito.porGravidade(gravidade).codigo();
     }
 
     double haversine(double lat1, double lon1, double lat2, double lon2) {
         return calculadoraDistanciaGeografica.haversine(lat1, lon1, lat2, lon2);
     }
 
-    private String calcularPressaoSus(String coMunicipio, int leitosSus) {
+    private String calcularPressaoSus(CoIbge coMunicipio, int leitosSus) {
         int anoAtual = Year.now().getValue();
-        List<CasoDengue> recentes = casoDenguePort.findByCoMunicipioAndAno(coMunicipio, anoAtual);
+        List<CasoDengue> recentes = casoDenguePort.findByCoMunicipioAndAno(coMunicipio.value(), anoAtual);
 
         if (recentes.isEmpty() || leitosSus == 0) {
             return "NORMAL";
@@ -154,7 +150,7 @@ public class EncaminhamentoService {
             }
 
             try {
-                EncaminhamentoResponse resposta = buscarHospitais(codigoCapital, "74", 1);
+                EncaminhamentoResponse resposta = buscarHospitais(codigoCapital, TipoLeito.clinico().codigo(), 1);
                 if (resposta != null && resposta.getHospitais() != null && !resposta.getHospitais().isEmpty()) {
                     resultado.add(resposta.getHospitais().get(0));
                 }

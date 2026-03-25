@@ -17,8 +17,14 @@ public class MontadorContextoOperacional {
     }
 
     public String montarPadraoHistorico(String comparativoHistorico) {
-        if (comparativoHistorico == null || comparativoHistorico.isBlank()
-                || comparativoHistorico.contains("nÃƒÂ£o havia registros")) {
+        if (comparativoHistorico == null || comparativoHistorico.isBlank()) {
+            return "Dados histÃƒÂ³ricos insuficientes para comparaÃƒÂ§ÃƒÂ£o do perÃƒÂ­odo.";
+        }
+        String comparativoNormalizado = comparativoHistorico.toLowerCase();
+        if (comparativoNormalizado.contains("nao havia registros")
+                || comparativoNormalizado.contains("nÃƒÂ£o havia registros")
+                || comparativoNormalizado.contains("nãƒâ£o havia registros")
+                || comparativoNormalizado.contains("havia registros compar")) {
             return "Dados histÃƒÂ³ricos insuficientes para comparaÃƒÂ§ÃƒÂ£o do perÃƒÂ­odo.";
         }
         return comparativoHistorico;

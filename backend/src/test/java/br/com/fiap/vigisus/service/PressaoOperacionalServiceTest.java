@@ -1,10 +1,13 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.operacional.ConstruirContextoEpidemiologicoOperacional;
 import br.com.fiap.vigisus.application.operacional.MescladorHospitaisReferencia;
 import br.com.fiap.vigisus.application.operacional.MontadorContextoOperacional;
 import br.com.fiap.vigisus.application.operacional.MontadorPrevisaoOperacional;
 import br.com.fiap.vigisus.application.port.CasoDenguePort;
+import br.com.fiap.vigisus.application.port.MunicipioPort;
 import br.com.fiap.vigisus.domain.epidemiologia.ClassificacaoEpidemiologicaPolicy;
+import br.com.fiap.vigisus.domain.epidemiologia.ComparativoHistoricoEpidemiologicoPolicy;
 import br.com.fiap.vigisus.domain.operacional.CalculadoraNivelAtencaoOperacional;
 import br.com.fiap.vigisus.domain.operacional.CalculadoraTendenciaOperacional;
 import br.com.fiap.vigisus.domain.operacional.ChecklistOperacionalPolicy;
@@ -24,6 +27,7 @@ import java.time.LocalDate;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +45,9 @@ class PressaoOperacionalServiceTest {
 
     @Mock
     private CasoDenguePort casoDenguePort;
+
+    @Mock
+    private MunicipioPort municipioPort;
 
     @Mock
     private PrevisaoRiscoService previsaoRiscoService;
@@ -69,20 +76,25 @@ class PressaoOperacionalServiceTest {
     void setUp() {
         service = new PressaoOperacionalService(
                 municipioService,
-                casoDenguePort,
                 previsaoRiscoService,
                 encaminhamentoService,
                 iaService,
-                new ClassificacaoEpidemiologicaPolicy(),
-                new CalculadoraTendenciaOperacional(),
                 new CalculadoraNivelAtencaoOperacional(),
                 new MontadorPrevisaoOperacional(),
                 new MontadorContextoOperacional(),
                 new ChecklistOperacionalPolicy(),
-                new MescladorHospitaisReferencia()
+                new MescladorHospitaisReferencia(),
+                new ConstruirContextoEpidemiologicoOperacional(
+                        casoDenguePort,
+                        municipioPort,
+                        new ClassificacaoEpidemiologicaPolicy(),
+                        new ComparativoHistoricoEpidemiologicoPolicy(),
+                        new CalculadoraTendenciaOperacional()
+                )
         );
 
         lenient().when(municipioService.buscarPorCoIbge(CO_IBGE)).thenReturn(MUNICIPIO);
+        lenient().when(municipioPort.findByCoIbge(CO_IBGE)).thenReturn(Optional.of(MUNICIPIO));
         lenient().when(casoDenguePort.findCasosPorSemanas(anyString(), anyInt(), any())).thenReturn(List.of());
         lenient().when(casoDenguePort.sumTotalCasosByCoMunicipioAndAno(anyString(), anyInt())).thenReturn(0L);
         lenient().when(iaService.gerarTextoOperacional(anyString())).thenReturn("Briefing de teste.");
@@ -214,7 +226,8 @@ class PressaoOperacionalServiceTest {
         String outroIbge = "9999999";
         Municipio outro = Municipio.builder().coIbge(outroIbge).noMunicipio("Cidade X").sgUf("MG").build();
         int currentWeek = LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
-        when(municipioService.buscarPorCoIbge(outroIbge)).thenReturn(outro).thenThrow(new RuntimeException("sem populacao"));
+        when(municipioService.buscarPorCoIbge(outroIbge)).thenReturn(outro);
+        when(municipioPort.findByCoIbge(outroIbge)).thenThrow(new RuntimeException("sem populacao"));
         when(casoDenguePort.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear()), any()))
                 .thenReturn(buildSemanas(currentWeek, 2L, 2L, 2L, 2L));
         when(casoDenguePort.findCasosPorSemanas(eq(outroIbge), eq(LocalDate.now().getYear() - 1), any()))
