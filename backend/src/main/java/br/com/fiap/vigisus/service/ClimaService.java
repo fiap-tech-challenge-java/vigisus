@@ -5,7 +5,7 @@ import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoDailyData;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoResponse;
-import br.com.fiap.vigisus.exception.ApiExternaException;
+import br.com.fiap.vigisus.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -35,7 +35,7 @@ public class ClimaService implements ClimaPort {
         OpenMeteoResponse response = restTemplate.getForObject(url, OpenMeteoResponse.class);
 
         if (response == null || response.getCurrent() == null) {
-            throw new ApiExternaException("Open-Meteo");
+            throw new ExternalApiException("Open-Meteo", "resposta nula");
         }
 
         return ClimaAtualDTO.builder()
@@ -59,7 +59,7 @@ public class ClimaService implements ClimaPort {
         OpenMeteoResponse response = restTemplate.getForObject(url, OpenMeteoResponse.class);
 
         if (response == null || response.getDaily() == null) {
-            throw new ApiExternaException("Open-Meteo");
+            throw new ExternalApiException("Open-Meteo", "resposta nula");
         }
 
         OpenMeteoDailyData daily = response.getDaily();

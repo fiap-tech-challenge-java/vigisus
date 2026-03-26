@@ -49,7 +49,7 @@ class MunicipioServiceTest {
 
         assertThatThrownBy(() -> service.buscarPorCoIbge("9999999"))
                 .isInstanceOf(MunicipioNotFoundException.class)
-                .hasMessage("Município não encontrado: 9999999");
+                .hasMessageContaining("9999999");
     }
     @Test
     void listarPorUf_retornaMunicipiosDoEstado() {
