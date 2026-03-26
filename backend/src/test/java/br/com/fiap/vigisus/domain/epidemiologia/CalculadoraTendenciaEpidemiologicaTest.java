@@ -43,6 +43,20 @@ class CalculadoraTendenciaEpidemiologicaTest {
         ))).isEqualTo("ESTAVEL");
     }
 
+    @Test
+    void retornaEstavelQuandoListaNula() {
+        assertThat(calculadora.calcular(null)).isEqualTo("ESTAVEL");
+    }
+
+    @Test
+    void retornaEstavelQuandoMuitasSemanasComZeroCasos() {
+        assertThat(calculadora.calcular(List.of(
+                semana(1, 0), semana(2, 0), semana(3, 10), semana(4, 10),
+                semana(5, 10), semana(6, 10), semana(7, 10), semana(8, 10),
+                semana(9, 10), semana(10, 10)
+        ))).isEqualTo("ESTAVEL");
+    }
+
     private SemanaDTO semana(int numero, int casos) {
         return SemanaDTO.builder()
                 .semanaEpi(numero)
