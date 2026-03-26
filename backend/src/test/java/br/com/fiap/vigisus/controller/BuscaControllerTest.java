@@ -3,7 +3,7 @@ package br.com.fiap.vigisus.controller;
 import br.com.fiap.vigisus.application.busca.BuscaCompletaUseCase;
 import br.com.fiap.vigisus.dto.BuscaCompletaResponse;
 import br.com.fiap.vigisus.dto.BuscaRequest;
-import br.com.fiap.vigisus.exception.NotFoundException;
+import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,10 +47,10 @@ class BuscaControllerTest {
     @Test
     void buscar_propagaErrosDoUseCase() {
         when(buscaCompletaUseCase.buscarPorPergunta("pergunta vaga"))
-                .thenThrow(new NotFoundException("Nome do municipio"));
+                .thenThrow(new RecursoNaoEncontradoException("Município", "nome não fornecido na pergunta"));
 
         assertThatThrownBy(() -> controller.buscar(new BuscaRequest("pergunta vaga")))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Nome do municipio");
+                .isInstanceOf(RecursoNaoEncontradoException.class)
+                .hasMessageContaining("Município");
     }
 }

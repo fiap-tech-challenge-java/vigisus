@@ -42,8 +42,7 @@ public class PerfilEpidemiologicoService {
                 ? municipio.getPopulacao()
                 : 0L;
         if (populacao == 0L) {
-            throw new RecursoNaoEncontradoException(
-                    "População não disponível para o município: " + coIbge);
+            throw new RecursoNaoEncontradoException("Município", coIbge);
         }
         double incidencia = (double) total / populacao * 100_000;
 

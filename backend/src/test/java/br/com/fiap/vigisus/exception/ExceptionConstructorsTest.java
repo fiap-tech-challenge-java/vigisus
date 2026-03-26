@@ -7,24 +7,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ExceptionConstructorsTest {
 
     @Test
-    void externalApiException_preservaMensagemECausa() {
-        RuntimeException cause = new RuntimeException("boom");
+    void externalApiException_montaMensagemPadrao() {
+        ExternalApiException ex = new ExternalApiException("Open-Meteo", "resposta nula");
 
-        ExternalApiException semCausa = new ExternalApiException("falha externa");
-        ExternalApiException comCausa = new ExternalApiException("falha externa", cause);
-
-        assertThat(semCausa).hasMessage("falha externa").hasNoCause();
-        assertThat(comCausa).hasMessage("falha externa").hasCause(cause);
+        assertThat(ex).hasMessageContaining("Open-Meteo");
+        assertThat(ex.getErrorCode()).isEqualTo("EXTERNAL_API_ERROR");
     }
 
     @Test
-    void apiExternaException_montaMensagemPadrao() {
-        RuntimeException cause = new RuntimeException("boom");
+    void recursoNaoEncontradoException_montaMensagemPadrao() {
+        RecursoNaoEncontradoException ex = new RecursoNaoEncontradoException("Município", "123");
 
-        ApiExternaException semCausa = new ApiExternaException("OpenMeteo");
-        ApiExternaException comCausa = new ApiExternaException("OpenMeteo", cause);
+        assertThat(ex).hasMessageContaining("Município").hasMessageContaining("123");
+        assertThat(ex.getErrorCode()).isEqualTo("RECURSO_NAO_ENCONTRADO");
+    }
 
-        assertThat(semCausa).hasMessageContaining("OpenMeteo").hasNoCause();
-        assertThat(comCausa).hasMessageContaining("OpenMeteo").hasCause(cause);
+    @Test
+    void municipioNotFoundException_estendeRecursoNaoEncontrado() {
+        MunicipioNotFoundException ex = new MunicipioNotFoundException("3106200");
+
+        assertThat(ex).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThat(ex.getErrorCode()).isEqualTo("RECURSO_NAO_ENCONTRADO");
+        assertThat(ex).hasMessageContaining("3106200");
     }
 }
