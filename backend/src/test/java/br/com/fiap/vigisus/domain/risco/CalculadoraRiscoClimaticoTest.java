@@ -57,6 +57,42 @@ class CalculadoraRiscoClimaticoTest {
         assertThat(riscoDiario).isEmpty();
     }
 
+    @Test
+    void extraiMetricasQuandoClimaAtualNulo_usaValoresZero() {
+        MetricasRiscoClimatico metricas = calculadora.extrairMetricas(null, previsaoConstante(3, 26.0, 5.0, 40));
+
+        assertThat(metricas.temperaturaAtual()).isZero();
+        assertThat(metricas.umidadeAtual()).isZero();
+        assertThat(metricas.temperaturaMedia14Dias()).isEqualTo(26.0);
+    }
+
+    @Test
+    void calculaRiscoDiarioComChuvaAcimaDe20mm() {
+        List<RiscoDiarioDTO> riscoDiario = calculadora.calcularRiscoDiario(
+                previsaoConstante(5, 29.0, 25.0, 65),
+                new ClassificacaoRiscoMunicipioPolicy(),
+                (indice, dia) -> LocalDate.of(2024, 6, 1).plusDays(indice).toString()
+        );
+
+        assertThat(riscoDiario).hasSize(5);
+        assertThat(riscoDiario.get(0).getScoreDia()).isEqualTo(5);
+        assertThat(riscoDiario.get(0).getClassificacao()).isEqualTo("ALTO");
+    }
+
+    @Test
+    void calcularScore_quandoTemperaturasBaixas_retornaZero() {
+        MetricasRiscoClimatico metricas = new MetricasRiscoClimatico(20.0, 50, 20.0, 10.0, 30.0);
+
+        assertThat(calculadora.calcularScore(metricas)).isZero();
+    }
+
+    @Test
+    void calcularScore_quandoTemperaturaEntre25e28_retorna3Pontos() {
+        MetricasRiscoClimatico metricas = new MetricasRiscoClimatico(26.0, 75, 26.0, 60.0, 55.0);
+
+        assertThat(calculadora.calcularScore(metricas)).isEqualTo(3);
+    }
+
     private List<PrevisaoDiariaDTO> previsaoConstante(int dias, double temperatura, double chuva, int probabilidade) {
         return IntStream.range(0, dias)
                 .mapToObj(indice -> PrevisaoDiariaDTO.builder()
