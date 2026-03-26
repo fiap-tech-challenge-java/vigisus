@@ -23,6 +23,20 @@ springdoc:
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  info:
+    app:
+      name: VigiSUS
+      description: Plataforma de vigilância epidemiológica do SUS
+      version: 1.0.0
+
 vigisus:
   ia:
     provider: gemini

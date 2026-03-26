@@ -14,11 +14,16 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // API pública de dados abertos do SUS.
+        // Autenticação para endpoints administrativos está planejada para versão 2.0.
+        // Por ora, todos os endpoints são públicos conforme escopo do hackathon.
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/**").permitAll()
+                .anyRequest().permitAll());
         return http.build();
     }
 }
