@@ -15,6 +15,7 @@ O projeto integra dados publicos nacionais, aplica regras de dominio no backend 
 - [Como Rodar](#como-rodar)
 - [Qualidade e Testes](#qualidade-e-testes)
 - [Endpoints Principais](#endpoints-principais)
+- [Segurança](#segurança)
 - [Documentacao Detalhada](#documentacao-detalhada)
 - [Roadmap Tecnico](#roadmap-tecnico)
 
@@ -248,6 +249,16 @@ Base URL local: `http://localhost:8080`
 
 Documentacao viva da API:
 - `http://localhost:8080/swagger-ui.html`
+
+## Segurança
+
+A API VigiSUS expõe exclusivamente **dados epidemiológicos públicos e agregados** 
+provenientes do DATASUS, IBGE e Open-Meteo. Não há armazenamento ou exposição 
+de dados pessoais de pacientes, estando em conformidade com a LGPD para dados 
+de saúde pública.
+
+Todos os endpoints de consulta são públicos por design. Autenticação JWT 
+para operadores está planejada para a versão 2.0 (roadmap técnico).
 
 ## Documentacao Detalhada
 - Arquitetura final: [docs/ARQUITETURA_FINAL_PROJETO.md](docs/ARQUITETURA_FINAL_PROJETO.md)
