@@ -6,7 +6,7 @@ import br.com.fiap.vigisus.dto.IntencaoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
-import br.com.fiap.vigisus.exception.NotFoundException;
+import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.service.EncaminhamentoService;
 import br.com.fiap.vigisus.service.IaService;
@@ -138,8 +138,8 @@ class BuscaCompletaUseCaseTest {
         when(iaService.interpretarPergunta("pergunta vaga")).thenReturn(IntencaoDTO.builder().uf("MG").build());
 
         assertThatThrownBy(() -> useCase.buscarPorPergunta("pergunta vaga"))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Nome do municipio");
+                .isInstanceOf(RecursoNaoEncontradoException.class)
+                .hasMessageContaining("Município");
     }
 
     @Test
@@ -193,7 +193,7 @@ class BuscaCompletaUseCaseTest {
                 .build());
 
         assertThatThrownBy(() -> useCase.buscarPorPergunta("lavras"))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("UF nao identificada");
+                .isInstanceOf(RecursoNaoEncontradoException.class)
+                .hasMessageContaining("UF");
     }
 }

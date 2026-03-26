@@ -5,7 +5,7 @@ import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoCurrentData;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoDailyData;
 import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoResponse;
-import br.com.fiap.vigisus.exception.ApiExternaException;
+import br.com.fiap.vigisus.exception.ExternalApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,7 +58,7 @@ class ClimaServiceTest {
         when(restTemplate.getForObject(anyString(), eq(OpenMeteoResponse.class))).thenReturn(new OpenMeteoResponse());
 
         assertThatThrownBy(() -> service.buscarClimaAtual(-21.2, -45.0))
-                .isInstanceOf(ApiExternaException.class)
+                .isInstanceOf(ExternalApiException.class)
                 .hasMessageContaining("Open-Meteo");
     }
 
@@ -90,7 +90,7 @@ class ClimaServiceTest {
         when(restTemplate.getForObject(anyString(), eq(OpenMeteoResponse.class))).thenReturn(new OpenMeteoResponse());
 
         assertThatThrownBy(() -> service.buscarPrevisao16Dias(-21.2, -45.0))
-                .isInstanceOf(ApiExternaException.class)
+                .isInstanceOf(ExternalApiException.class)
                 .hasMessageContaining("Open-Meteo");
     }
 }

@@ -6,7 +6,7 @@ import br.com.fiap.vigisus.dto.IntencaoDTO;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
-import br.com.fiap.vigisus.exception.NotFoundException;
+import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.Municipio;
 import br.com.fiap.vigisus.service.EncaminhamentoService;
 import br.com.fiap.vigisus.service.IaService;
@@ -132,11 +132,11 @@ public class BuscaCompletaUseCase {
 
     private Municipio encontrarMunicipio(String nome, String uf) {
         if (nome == null || nome.isBlank()) {
-            throw new NotFoundException("Nome do municipio nao identificado na pergunta");
+            throw new RecursoNaoEncontradoException("Município", "nome não fornecido na pergunta");
         }
 
         if (uf == null || uf.isBlank()) {
-            throw new NotFoundException("UF nao identificada na pergunta");
+            throw new RecursoNaoEncontradoException("UF", "não identificada na pergunta");
         }
 
         List<Municipio> candidatos = municipioService.buscarPorNomeEUf(nome, uf);
@@ -149,10 +149,7 @@ public class BuscaCompletaUseCase {
         }
 
         return municipioService.buscarPorNome(nome)
-                .orElseThrow(() -> new NotFoundException(
-                        "Municipio '" + nome + "' nao encontrado. " +
-                                "Tente usar o nome completo ou o codigo IBGE."
-                ));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Município", nome));
     }
 
     private int resolverAno(Integer ano) {

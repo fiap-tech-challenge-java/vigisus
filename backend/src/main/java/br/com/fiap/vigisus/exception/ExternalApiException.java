@@ -1,12 +1,8 @@
 package br.com.fiap.vigisus.exception;
 
-public class ExternalApiException extends RuntimeException {
+public class ExternalApiException extends VigisusException {
 
-    public ExternalApiException(String message) {
-        super(message);
-    }
-
-    public ExternalApiException(String message, Throwable cause) {
-        super(message, cause);
+    public ExternalApiException(String servico, String motivo) {
+        super("Falha na API externa [" + servico + "]: " + motivo, "EXTERNAL_API_ERROR");
     }
 }

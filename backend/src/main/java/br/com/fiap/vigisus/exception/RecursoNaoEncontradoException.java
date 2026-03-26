@@ -1,8 +1,8 @@
 package br.com.fiap.vigisus.exception;
 
-public class RecursoNaoEncontradoException extends RuntimeException {
+public class RecursoNaoEncontradoException extends VigisusException {
 
-    public RecursoNaoEncontradoException(String message) {
-        super(message);
+    public RecursoNaoEncontradoException(String recurso, Object id) {
+        super(recurso + " não encontrado(a): " + id, "RECURSO_NAO_ENCONTRADO");
     }
 }

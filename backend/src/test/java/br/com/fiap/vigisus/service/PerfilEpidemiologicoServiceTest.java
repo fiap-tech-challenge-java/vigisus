@@ -109,7 +109,7 @@ class PerfilEpidemiologicoServiceTest {
 
         assertThatThrownBy(() -> service.gerarPerfil(CO_IBGE, "dengue", 2024))
                 .isInstanceOf(RecursoNaoEncontradoException.class)
-                .hasMessageContaining("Popula");
+                .hasMessageContaining("3131307");
     }
 
     @Test
