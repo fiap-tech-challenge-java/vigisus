@@ -51,5 +51,24 @@ services:
     depends_on:
       - backend
 
+  seed:
+    build:
+      context: ./data-pipeline
+      dockerfile: Dockerfile
+    container_name: vigisus-seed
+    command: python seed_mock.py
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vigisus}
+      DB_USER: ${DB_USER:-vigisus}
+      DB_PASS: ${DB_PASS:-vigisus123}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: no
+
 volumes:
   postgres_data:
