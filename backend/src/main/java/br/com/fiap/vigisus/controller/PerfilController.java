@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/perfil")
-@Tag(name = "Perfil Epidemiologico")
+@Tag(name = "Epidemiologia", description = "Histórico e ranking epidemiológico por município, estado e Brasil")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class PerfilController {

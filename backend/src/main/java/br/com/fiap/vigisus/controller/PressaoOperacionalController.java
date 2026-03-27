@@ -18,7 +18,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/operacional")
-@Tag(name = "Painel Operacional")
+@Tag(name = "Operacional", description = "Pressão assistencial e protocolo de surto")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class PressaoOperacionalController {

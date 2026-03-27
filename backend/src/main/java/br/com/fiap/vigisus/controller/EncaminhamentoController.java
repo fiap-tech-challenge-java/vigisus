@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/encaminhar")
-@Tag(name = "Encaminhamento de Pacientes")
+@Tag(name = "Encaminhamento", description = "Encaminhamento hospitalar data-driven com cálculo de distância")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class EncaminhamentoController {
@@ -22,21 +22,8 @@ public class EncaminhamentoController {
 
     @GetMapping
     @Operation(
-            summary = "Hospitais com estrutura compativel",
-            description = """
-                    Retorna hospitais ordenados por distancia com leitos SUS
-                    disponiveis e servico de infectologia, baseado no CNES
-                    (Cadastro Nacional de Estabelecimentos de Saude).
-
-                    IMPORTANTE: O CNES informa capacidade instalada (leitos que
-                    o hospital possui). A confirmacao de disponibilidade no momento
-                    do encaminhamento deve ser feita por telefone - numero fornecido
-                    na resposta.
-
-                    Retorna contexto informacional baseado em dados publicos do SUS.
-                    Nao realiza diagnostico, triagem clinica nem define conduta medica.
-                    A decisao de encaminhamento permanece com o profissional de saude.
-                    """)
+            summary = "Encaminhar paciente para hospital",
+            description = "Localiza o hospital mais próximo com leito SUS disponível usando Fórmula de Haversine")
     public EncaminhamentoResponse getEncaminhamento(
             @RequestParam String municipio,
             @RequestParam(defaultValue = "dengue") String condicao,

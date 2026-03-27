@@ -26,12 +26,12 @@ class VigisusApplicationUnitTest {
 
         assertThat(openAPI.getInfo().getTitle()).contains("V");
         assertThat(openAPI.getInfo().getVersion()).isEqualTo("1.0.0");
-        assertThat(openAPI.getInfo().getDescription()).contains("DATASUS").contains("Hackathon FIAP");
-        assertThat(openAPI.getTags()).hasSize(6);
+        assertThat(openAPI.getInfo().getDescription()).contains("DATASUS").contains("Open-Meteo");
+        assertThat(openAPI.getTags()).hasSize(7);
         assertThat(openAPI.getTags().stream().map(tag -> tag.getName()).toList())
-                .anySatisfy(name -> assertThat(name).contains("Perfil Epidemiol"))
-                .anySatisfy(name -> assertThat(name).contains("Previs"))
+                .anySatisfy(name -> assertThat(name).contains("Epidemiologia"))
+                .anySatisfy(name -> assertThat(name).contains("Risco e Recursos"))
                 .anySatisfy(name -> assertThat(name).contains("Busca por Linguagem Natural"))
-                .anySatisfy(name -> assertThat(name).contains("Administra"));
+                .anySatisfy(name -> assertThat(name).contains("Admin"));
     }
 }

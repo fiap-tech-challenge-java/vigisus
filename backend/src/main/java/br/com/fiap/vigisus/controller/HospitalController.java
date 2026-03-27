@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/hospitais")
-@Tag(name = "Hospitais")
+@Tag(name = "Risco e Recursos", description = "Previsão de risco climático e localização de hospitais")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class HospitalController {
