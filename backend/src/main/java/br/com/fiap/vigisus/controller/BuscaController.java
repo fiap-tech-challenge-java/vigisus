@@ -3,6 +3,8 @@ package br.com.fiap.vigisus.controller;
 import br.com.fiap.vigisus.application.busca.BuscaCompletaUseCase;
 import br.com.fiap.vigisus.dto.BuscaCompletaResponse;
 import br.com.fiap.vigisus.dto.BuscaRequest;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BuscaController {
 
     private final BuscaCompletaUseCase buscaCompletaUseCase;
+    private final MeterRegistry meterRegistry;
 
     @PostMapping
     @Operation(
@@ -40,6 +43,11 @@ public class BuscaController {
             @RequestParam String uf,
             @RequestParam(defaultValue = "dengue") String doenca,
             @RequestParam(required = false) Integer ano) {
+        Counter.builder("busca.municipio")
+                .tag("municipio", municipio)
+                .tag("uf", uf)
+                .register(meterRegistry)
+                .increment();
         return ResponseEntity.ok(buscaCompletaUseCase.buscarDireto(municipio, uf, doenca, ano));
     }
 }

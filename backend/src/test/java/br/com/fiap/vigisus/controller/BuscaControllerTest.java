@@ -4,6 +4,7 @@ import br.com.fiap.vigisus.application.busca.BuscaCompletaUseCase;
 import br.com.fiap.vigisus.dto.BuscaCompletaResponse;
 import br.com.fiap.vigisus.dto.BuscaRequest;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +21,7 @@ class BuscaControllerTest {
     @BeforeEach
     void setUp() {
         buscaCompletaUseCase = mock(BuscaCompletaUseCase.class);
-        controller = new BuscaController(buscaCompletaUseCase);
+        controller = new BuscaController(buscaCompletaUseCase, new SimpleMeterRegistry());
     }
 
     @Test
