@@ -1,5 +1,6 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.ClimaPort;
 import br.com.fiap.vigisus.domain.geografia.CatalogoGeograficoBrasil;
 import br.com.fiap.vigisus.domain.risco.CalculadoraRiscoClimatico;
 import br.com.fiap.vigisus.domain.risco.ClassificacaoRiscoMunicipioPolicy;
@@ -32,7 +33,7 @@ class PrevisaoRiscoServiceTest {
     private MunicipioService municipioService;
 
     @Mock
-    private ClimaService climaService;
+    private ClimaPort climaService;
 
     private PrevisaoRiscoService service;
 

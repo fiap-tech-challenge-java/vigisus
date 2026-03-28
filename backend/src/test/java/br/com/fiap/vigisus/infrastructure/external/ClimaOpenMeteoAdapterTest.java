@@ -1,4 +1,4 @@
-package br.com.fiap.vigisus.service;
+package br.com.fiap.vigisus.infrastructure.external;
 
 import br.com.fiap.vigisus.dto.ClimaAtualDTO;
 import br.com.fiap.vigisus.dto.PrevisaoDiariaDTO;
@@ -22,16 +22,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ClimaServiceTest {
+class ClimaOpenMeteoAdapterTest {
 
     @Mock
     private RestTemplate restTemplate;
 
-    private ClimaService service;
+    private ClimaOpenMeteoAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        service = new ClimaService(restTemplate);
+        adapter = new ClimaOpenMeteoAdapter(restTemplate);
     }
 
     @Test
@@ -46,7 +46,7 @@ class ClimaServiceTest {
 
         when(restTemplate.getForObject(anyString(), eq(OpenMeteoResponse.class))).thenReturn(response);
 
-        ClimaAtualDTO dto = service.buscarClimaAtual(-21.2, -45.0);
+        ClimaAtualDTO dto = adapter.buscarClimaAtual(-21.2, -45.0);
 
         assertThat(dto.getTemperatura()).isEqualTo(28.5);
         assertThat(dto.getUmidade()).isEqualTo(81);
@@ -57,7 +57,7 @@ class ClimaServiceTest {
     void buscarClimaAtual_lancaQuandoRespostaInvalida() {
         when(restTemplate.getForObject(anyString(), eq(OpenMeteoResponse.class))).thenReturn(new OpenMeteoResponse());
 
-        assertThatThrownBy(() -> service.buscarClimaAtual(-21.2, -45.0))
+        assertThatThrownBy(() -> adapter.buscarClimaAtual(-21.2, -45.0))
                 .isInstanceOf(ExternalApiException.class)
                 .hasMessageContaining("Open-Meteo");
     }
@@ -75,7 +75,7 @@ class ClimaServiceTest {
 
         when(restTemplate.getForObject(anyString(), eq(OpenMeteoResponse.class))).thenReturn(response);
 
-        List<PrevisaoDiariaDTO> previsoes = service.buscarPrevisao16Dias(-21.2, -45.0);
+        List<PrevisaoDiariaDTO> previsoes = adapter.buscarPrevisao16Dias(-21.2, -45.0);
 
         assertThat(previsoes).hasSize(2);
         assertThat(previsoes.get(0).getTemperaturaMaxima()).isEqualTo(30.0);
@@ -89,7 +89,7 @@ class ClimaServiceTest {
     void buscarPrevisao16Dias_lancaQuandoRespostaInvalida() {
         when(restTemplate.getForObject(anyString(), eq(OpenMeteoResponse.class))).thenReturn(new OpenMeteoResponse());
 
-        assertThatThrownBy(() -> service.buscarPrevisao16Dias(-21.2, -45.0))
+        assertThatThrownBy(() -> adapter.buscarPrevisao16Dias(-21.2, -45.0))
                 .isInstanceOf(ExternalApiException.class)
                 .hasMessageContaining("Open-Meteo");
     }
