@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.dto.PressaoOperacionalRequest;
 import br.com.fiap.vigisus.dto.PressaoOperacionalResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +40,7 @@ public class PressaoOperacionalController {
 
                     Fontes: SINAN (casos), CNES (hospitais), Open-Meteo (clima), IBGE (populacao).
                     """)
-    public PressaoOperacionalResponse avaliarPressao(@RequestBody PressaoOperacionalRequest request) {
+    public PressaoOperacionalResponse avaliarPressao(@Valid @RequestBody PressaoOperacionalRequest request) {
         return avaliarPressaoOperacionalUseCase.executar(request);
     }
 

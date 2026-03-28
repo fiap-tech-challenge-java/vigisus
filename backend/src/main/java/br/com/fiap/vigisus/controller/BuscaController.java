@@ -5,6 +5,7 @@ import br.com.fiap.vigisus.dto.BuscaCompletaResponse;
 import br.com.fiap.vigisus.dto.BuscaRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -28,7 +29,7 @@ public class BuscaController {
     @Operation(
             summary = "Busca por linguagem natural",
             description = "Interpreta a pergunta, consulta a base de dados e retorna resposta narrativa gerada por IA")
-    public BuscaCompletaResponse buscar(@RequestBody BuscaRequest request) {
+    public BuscaCompletaResponse buscar(@Valid @RequestBody BuscaRequest request) {
         return buscaCompletaUseCase.buscarPorPergunta(request.getPergunta());
     }
 
