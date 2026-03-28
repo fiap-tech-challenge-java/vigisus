@@ -1,5 +1,9 @@
 # VigiSUS
 
+![CI](https://github.com/fiap-tech-challenge-java/vigisus/actions/workflows/ci.yml/badge.svg)
+<img src="https://img.shields.io/badge/Java-17-orange">
+<img src="https://img.shields.io/badge/Spring%20Boot-3.2-green">
+
 Plataforma de vigilancia epidemiologica para apoio a decisao em saude publica, com foco inicial em dengue, chikungunya e zika.
 
 O projeto integra dados publicos nacionais, aplica regras de dominio no backend e entrega uma experiencia web acessivel para leitura em nivel Brasil, Estado e Municipio.
