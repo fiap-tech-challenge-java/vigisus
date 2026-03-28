@@ -18,7 +18,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/previsao-risco")
-@Tag(name = "Previsao de Risco")
+@Tag(name = "Risco e Recursos", description = "Previsão de risco climático e localização de hospitais")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class PrevisaoRiscoController {
@@ -28,18 +28,8 @@ public class PrevisaoRiscoController {
 
     @GetMapping("/{coIbge}")
     @Operation(
-            summary = "Previsao de risco epidemiologico",
-            description = """
-                    Calcula score de risco para as proximas 2 semanas cruzando
-                    padrao sazonal historico (SINAN) com previsao climatica
-                    (Open-Meteo). Baseado em evidencia cientifica publicada sobre
-                    condicoes favoraveis ao Aedes aegypti.
-
-                    Score 0-8: 0-1 Baixo · 2-3 Moderado · 4-5 Alto · 6+ Muito Alto.
-                    Retorna contexto informacional baseado em dados publicos do SUS.
-                    Nao realiza diagnostico, triagem clinica nem define conduta medica.
-                    A decisao final permanece com o profissional de saude habilitado.
-                    """)
+            summary = "Previsão de risco do município",
+            description = "Combina sazonalidade histórica (SINAN) com previsão climática (Open-Meteo) para calcular risco nas próximas semanas")
     public PrevisaoRiscoResponse getPrevisaoRisco(
             @PathVariable String coIbge,
             @RequestParam(defaultValue = "dengue") String doenca) {

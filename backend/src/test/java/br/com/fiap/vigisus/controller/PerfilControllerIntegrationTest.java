@@ -34,7 +34,7 @@ class PerfilControllerIntegrationTest {
 
         mockMvc.perform(get("/api/perfil/9999999"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.erro").value("MUNICIPIO_NAO_ENCONTRADO"));
+                .andExpect(jsonPath("$.code").value("RECURSO_NAO_ENCONTRADO"));
     }
 
     @Test

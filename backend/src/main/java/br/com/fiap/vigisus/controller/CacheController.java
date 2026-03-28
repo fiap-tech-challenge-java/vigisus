@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
-@Tag(name = "Administração")
+@Tag(name = "Admin", description = "Administração de cache e configurações internas")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class CacheController {

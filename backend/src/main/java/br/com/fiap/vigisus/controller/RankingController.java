@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/ranking")
-@Tag(name = "Ranking Municipal")
+@Tag(name = "Epidemiologia", description = "Histórico e ranking epidemiológico por município, estado e Brasil")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class RankingController {

@@ -20,7 +20,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/triagem")
-@Tag(name = "Triagem Inteligente")
+@Tag(name = "Triagem", description = "Triagem orientativa de pacientes por sintomas e perfil")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class TriagemController {
@@ -30,18 +30,8 @@ public class TriagemController {
 
     @PostMapping("/avaliar")
     @Operation(
-            summary = "Contexto clinico-epidemiologico",
-            description = """
-                    Organiza sintomas informados com o contexto epidemiologico
-                    real do municipio para apoio informacional ao profissional.
-
-                    NAO realiza triagem clinica, diagnostico ou classificacao
-                    de risco clinico. A avaliacao e decisao sao exclusivamente
-                    do profissional de saude habilitado.
-
-                    Retorna contexto informacional baseado em dados publicos do SUS.
-                    Fontes: SINAN (contexto epidemiologico), CNES (hospitais).
-                    """)
+            summary = "Avaliar triagem de paciente",
+            description = "Calcula score de triagem com base nos sintomas e retorna prioridade e orientações")
     public TriagemResponse avaliar(@Valid @RequestBody TriagemRequest request) {
         return avaliarTriagemUseCase.executar(request);
     }

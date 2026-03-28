@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/busca")
-@Tag(name = "Busca por Linguagem Natural")
+@Tag(name = "Busca por Linguagem Natural", description = "Interface conversacional com IA — pergunte em português livre")
 @CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class BuscaController {
@@ -26,22 +26,8 @@ public class BuscaController {
 
     @PostMapping
     @Operation(
-            summary = "Busca completa por linguagem natural",
-            description = """
-                    Interpreta uma pergunta em portugues e retorna contexto
-                    epidemiologico completo: historico de casos, risco climatico,
-                    hospitais com estrutura disponivel e resumo narrativo gerado
-                    por IA.
-
-                    Exemplo de perguntas:
-                      "dengue em Lavras MG 2024"
-                      "situacao da dengue em Belo Horizonte"
-                      "casos de dengue em Varginha nos ultimos anos"
-
-                    Retorna contexto informacional baseado em dados publicos do SUS.
-                    A IA narra dados existentes. Nao realiza diagnostico.
-                    A decisao final permanece com o profissional de saude habilitado.
-                    """)
+            summary = "Busca por linguagem natural",
+            description = "Interpreta a pergunta, consulta a base de dados e retorna resposta narrativa gerada por IA")
     public BuscaCompletaResponse buscar(@RequestBody BuscaRequest request) {
         return buscaCompletaUseCase.buscarPorPergunta(request.getPergunta());
     }
