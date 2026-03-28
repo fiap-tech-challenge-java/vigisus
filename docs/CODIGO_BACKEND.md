@@ -86,12 +86,14 @@ Responsabilidade: adaptacao HTTP (request/response), validacao de borda e delega
 
 #### Encaminhamento
 - `domain/encaminhamento/ClassificacaoPressaoSusPolicy.java`
+- `domain/encaminhamento/NivelPressaoSus.java`       — Value Object imutavel
 - `domain/encaminhamento/TipoLeito.java`
 
 #### Epidemiologia
 - `domain/epidemiologia/CalculadoraTendenciaEpidemiologica.java`
 - `domain/epidemiologia/ClassificacaoEpidemiologicaPolicy.java`
 - `domain/epidemiologia/ComparativoHistoricoEpidemiologicoPolicy.java`
+- `domain/epidemiologia/IncidenciaPor100kHab.java`   — Value Object imutavel
 - `domain/epidemiologia/JanelaEpidemiologicaQuatroSemanas.java`
 - `domain/epidemiologia/SemanaEpidemiologica.java`
 
@@ -111,6 +113,8 @@ Responsabilidade: adaptacao HTTP (request/response), validacao de borda e delega
 - `domain/risco/ClassificacaoRiscoMunicipioPolicy.java`
 - `domain/risco/ClassificacaoRiscoPolicy.java`
 - `domain/risco/MetricasRiscoClimatico.java`
+- `domain/risco/RiscoAltoDetectadoEvent.java`        — Domain Event
+- `domain/risco/ScoreRisco.java`                     — Value Object imutavel
 
 #### Triagem
 - `domain/triagem/CalculadoraScoreTriagem.java`
@@ -172,11 +176,11 @@ Camada de orquestracao/compatibilidade:
 - `SecurityConfig.java`
 
 ### 3.9 Excecoes (`exception/*`)
-- `VigisusException.java`                — base abstrata de todas as excecoes
-- `RecursoNaoEncontradoException.java`   — HTTP 404
-- `MunicipioNotFoundException.java`      — especializacao de RecursoNaoEncontrado
-- `DadosInsuficientesException.java`     — HTTP 422
-- `ExternalApiException.java`            — HTTP 502 (falha em API externa)
+- `VigisusException.java`                — base abstrata de todas as excecoes do dominio
+- `RecursoNaoEncontradoException.java`   — HTTP 404 (recurso nao encontrado)
+- `MunicipioNotFoundException.java`      — HTTP 404 (especializacao para municipio)
+- `DadosInsuficientesException.java`     — HTTP 422 (dados insuficientes para calculo)
+- `ExternalApiException.java`            — HTTP 502 (falha em API externa: Gemini, Open-Meteo)
 - `GlobalExceptionHandler.java`          — handler centralizado com ErrorResponse record
 
 ## 4. Como o backend foi construido
@@ -199,6 +203,11 @@ Cobertura de testes em:
 Fonte: `backend/target/site/jacoco/jacoco.csv`
 - line coverage: **91.87%**
 - branch coverage: **80%** (apos exclusao de codigo gerado pelo Lombok via `lombok.config`)
+
+Nota: o branch coverage anterior de 23.16% incluia falsamente branches dos metodos
+gerados pelo Lombok (equals/hashCode/toString/builder) em 60+ classes de DTOs e models.
+Com `lombok.addLombokGeneratedAnnotation = true`, o JaCoCo exclui esses metodos
+automaticamente, revelando a cobertura real das regras de negocio.
 
 ## 6. Pontos fortes para apresentacao
 - separacao clara de camadas;
