@@ -1,5 +1,6 @@
 package br.com.fiap.vigisus.service;
 
+import br.com.fiap.vigisus.application.port.ClimaPort;
 import br.com.fiap.vigisus.application.port.CasoDenguePort;
 import br.com.fiap.vigisus.application.port.MunicipioPort;
 import br.com.fiap.vigisus.application.port.RedeAssistencialPort;
@@ -39,7 +40,7 @@ class RiscoAgregadoServiceTest {
     private RedeAssistencialPort redeAssistencialPort;
 
     @Mock
-    private ClimaService climaService;
+    private ClimaPort climaService;
 
     private RiscoAgregadoService service;
 

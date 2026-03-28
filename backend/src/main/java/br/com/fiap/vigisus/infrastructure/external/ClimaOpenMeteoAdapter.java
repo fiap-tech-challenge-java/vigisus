@@ -1,4 +1,4 @@
-package br.com.fiap.vigisus.service;
+package br.com.fiap.vigisus.infrastructure.external;
 
 import br.com.fiap.vigisus.application.port.ClimaPort;
 import br.com.fiap.vigisus.dto.ClimaAtualDTO;
@@ -8,16 +8,22 @@ import br.com.fiap.vigisus.dto.openmeteo.OpenMeteoResponse;
 import br.com.fiap.vigisus.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+/**
+ * Adapter de infraestrutura que integra com a API Open-Meteo para obtenção de dados climáticos.
+ *
+ * Implementa {@link ClimaPort} mantendo a regra de dependência da Clean Architecture:
+ * a camada de serviço depende apenas da Port (abstração), nunca deste adapter diretamente.
+ */
+@Component
 @RequiredArgsConstructor
-public class ClimaService implements ClimaPort {
+public class ClimaOpenMeteoAdapter implements ClimaPort {
 
     private static final String OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 

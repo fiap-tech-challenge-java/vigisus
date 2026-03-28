@@ -26,6 +26,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Camada de orquestração que coordena use cases e integrações externas.
+ *
+ * <p>Depende exclusivamente de Ports (application/port/) — nunca de repositórios
+ * JPA diretamente — respeitando a regra de dependência da Clean Architecture.
+ *
+ * <p>Candidato à migração para use case dedicado na versão 2.0.
+ */
 @Service
 @RequiredArgsConstructor
 public class EncaminhamentoService {
