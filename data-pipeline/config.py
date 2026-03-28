@@ -6,10 +6,17 @@ Centraliza todas as configurações do pipeline de ingestão de dados do VígiSU
 import os
 
 # Banco de dados
-# Sobrescreva com a variável de ambiente DB_URL em produção.
+# DB_URL tem precedência. Se não definida, monta a URL a partir das partes.
+# Atenção: os valores padrão abaixo são apenas para desenvolvimento local.
+# Em produção, defina as variáveis de ambiente explicitamente.
+_db_host = os.environ.get("DB_HOST", "localhost")
+_db_port = os.environ.get("DB_PORT", "5432")
+_db_name = os.environ.get("DB_NAME", "vigisus")
+_db_user = os.environ.get("DB_USER", "vigisus")
+_db_pass = os.environ.get("DB_PASS", "vigisus123")
 DB_URL = os.environ.get(
     "DB_URL",
-    "postgresql://vigisus:vigisus123@localhost:5432/vigisus",
+    f"postgresql://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}",
 )
 
 # FTP DATASUS

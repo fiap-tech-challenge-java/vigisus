@@ -149,10 +149,13 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Acessos:
-- Frontend (container): `http://localhost:5173`
+Acessos após subir:
+- Frontend: `http://localhost:5173`
 - Backend: `http://localhost:8080`
 - Swagger: `http://localhost:8080/swagger-ui.html`
+
+> O banco é populado automaticamente com dados de demonstração ao subir a stack.
+> Para recarregar os dados: `docker compose run --rm seed`
 
 ### 3) Rodar em modo desenvolvimento local (alternativa)
 1. Subir somente banco:
