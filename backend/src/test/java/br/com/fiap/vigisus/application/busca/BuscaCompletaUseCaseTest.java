@@ -13,6 +13,7 @@ import br.com.fiap.vigisus.service.IaService;
 import br.com.fiap.vigisus.service.MunicipioService;
 import br.com.fiap.vigisus.service.PerfilEpidemiologicoService;
 import br.com.fiap.vigisus.service.PrevisaoRiscoService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +47,8 @@ class BuscaCompletaUseCaseTest {
                 perfilService,
                 previsaoRiscoService,
                 encaminhamentoService,
-                municipioService
+                municipioService,
+                new SimpleMeterRegistry()
         );
     }
 
