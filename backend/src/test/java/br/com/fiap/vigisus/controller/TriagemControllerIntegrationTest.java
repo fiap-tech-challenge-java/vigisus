@@ -85,6 +85,28 @@ class TriagemControllerIntegrationTest {
         mockMvc.perform(post("/api/triagem/avaliar")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().is4xxClientError());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("DADOS_INVALIDOS"))
+                .andExpect(jsonPath("$.campos").isArray());
+    }
+
+    @Test
+    void deveRetornar400ParaSintomasVazios() throws Exception {
+        String requestBody = """
+                {
+                  "municipio": "Campinas",
+                  "sintomas": [],
+                  "diasSintomas": 3,
+                  "idade": 30,
+                  "comorbidades": []
+                }
+                """;
+
+        mockMvc.perform(post("/api/triagem/avaliar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("DADOS_INVALIDOS"))
+                .andExpect(jsonPath("$.campos").isArray());
     }
 }
