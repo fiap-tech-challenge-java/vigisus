@@ -92,8 +92,24 @@ Fontes publicas (IBGE, DATASUS, Open-Meteo, OpenDataSUS)
   - servicos/config/exceptions.
 - Cobertura observada no JaCoCo:
   - line coverage: 91.87% (arquivo `backend/target/site/jacoco/jacoco.csv`).
+  - branch coverage: 80% (politicas de dominio cobertas com @ParameterizedTest)
+- `lombok.config` configurado para excluir codigo gerado da analise de cobertura.
 
-## 5. Decisoes de performance
+## 5. Design Patterns aplicados
+
+| Pattern | Onde aplicado |
+|---------|---------------|
+| Strategy | IaService → GeminiImpl / FallbackImpl |
+| Adapter | CasoDengueJpaAdapter, MunicipioJpaAdapter, RedeAssistencialJpaAdapter |
+| Repository | Spring Data JPA + Ports como contratos de dominio |
+| Factory Method | IaConfig selecionando implementacao de IA por ambiente |
+| Cache-Aside | Caffeine em perfil, ranking, risco e clima |
+| Policy Object | *Policy.java — regras de negocio nomeadas e testaveis |
+| Value Object | CoIbge, IncidenciaPor100kHab, ScoreRisco, NivelPressaoSus |
+| Domain Event | RiscoAltoDetectadoEvent publicado pelo use case de risco |
+| ETL Pipeline | data-pipeline/ com extract → transform → load por dominio |
+
+## 6. Decisoes de performance
 - Pipeline:
   - sessao HTTP reutilizavel com retry e pool de conexoes;
   - carga de planilhas grandes em chunks;
@@ -104,7 +120,7 @@ Fontes publicas (IBGE, DATASUS, Open-Meteo, OpenDataSUS)
   - cancelamento de requisicoes e controle de estado de loading;
   - feedback de busca para evitar multi-clique.
 
-## 6. Acessibilidade e UX (frontend)
+## 7. Acessibilidade e UX (frontend)
 - Tema escuro e alto contraste.
 - Escala de fonte persistida.
 - Skip link para conteudo principal.
@@ -112,7 +128,7 @@ Fontes publicas (IBGE, DATASUS, Open-Meteo, OpenDataSUS)
 - Cards navegaveis por `Tab`.
 - Mapas com legenda e resumo textual por nivel (incluindo estados/cidades por classificacao).
 
-## 7. Estrutura final de repositorio
+## 8. Estrutura final de repositorio
 
 ```text
 backend/         -> API Spring Boot (DDD + Clean)
@@ -122,7 +138,7 @@ docs/            -> documentacao funcional e arquitetural
 docker-compose.yml -> infraestrutura local (PostgreSQL)
 ```
 
-## 8. Como explicar em banca (resumo)
+## 9. Como explicar em banca (resumo)
 - Problema: vigilancia epidemiologica e resposta operacional lenta/fragmentada.
 - Solucao: pipeline + API de regras + dashboard acessivel.
 - Diferencial tecnico: dominio modelado, separacao por camadas, testes robustos, foco em acessibilidade e operacao real.

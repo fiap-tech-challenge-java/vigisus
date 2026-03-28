@@ -172,13 +172,12 @@ Camada de orquestracao/compatibilidade:
 - `SecurityConfig.java`
 
 ### 3.9 Excecoes (`exception/*`)
-- `ApiExternaException.java`
-- `DadosInsuficientesException.java`
-- `ExternalApiException.java`
-- `GlobalExceptionHandler.java`
-- `MunicipioNotFoundException.java`
-- `NotFoundException.java`
-- `RecursoNaoEncontradoException.java`
+- `VigisusException.java`                — base abstrata de todas as excecoes
+- `RecursoNaoEncontradoException.java`   — HTTP 404
+- `MunicipioNotFoundException.java`      — especializacao de RecursoNaoEncontrado
+- `DadosInsuficientesException.java`     — HTTP 422
+- `ExternalApiException.java`            — HTTP 502 (falha em API externa)
+- `GlobalExceptionHandler.java`          — handler centralizado com ErrorResponse record
 
 ## 4. Como o backend foi construido
 - Regras complexas foram isoladas em classes de dominio para facilitar teste unitario.
@@ -199,7 +198,7 @@ Cobertura de testes em:
 ### 5.2 Cobertura observada
 Fonte: `backend/target/site/jacoco/jacoco.csv`
 - line coverage: **91.87%**
-- branch coverage: **23.16%**
+- branch coverage: **80%** (apos exclusao de codigo gerado pelo Lombok via `lombok.config`)
 
 ## 6. Pontos fortes para apresentacao
 - separacao clara de camadas;
