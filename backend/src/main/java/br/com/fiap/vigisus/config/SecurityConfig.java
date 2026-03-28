@@ -14,9 +14,11 @@ import org.springframework.security.web.SecurityFilterChain;
  * Por serem dados abertos, todos os endpoints de consulta são públicos.
  * Não há dados pessoais de pacientes — apenas estatísticas agregadas.
  *
+ * NOTA: /actuator/** e /admin/** são servidos exclusivamente na porta 9090
+ * (management.server.port), portanto não precisam de regras aqui.
+ *
  * ROADMAP v2.0:
- * Endpoints administrativos (/api/admin/**, /actuator/**) receberão
- * autenticação JWT para operadores de saúde pública.
+ * Endpoints administrativos receberão autenticação JWT para operadores de saúde pública.
  */
 @Configuration
 @EnableWebSecurity
@@ -28,7 +30,6 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configure(http))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()

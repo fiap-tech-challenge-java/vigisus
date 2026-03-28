@@ -24,10 +24,13 @@ server:
   port: 8080
 
 management:
+  server:
+    port: 9090
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+      base-path: /actuator
   endpoint:
     health:
       show-details: always

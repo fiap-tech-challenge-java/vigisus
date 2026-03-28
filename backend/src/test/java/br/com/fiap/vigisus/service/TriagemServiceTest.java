@@ -48,7 +48,8 @@ class TriagemServiceTest {
                 encaminhamentoService,
                 iaService,
                 new CalculadoraScoreTriagem(),
-                new PriorizacaoTriagemPolicy()
+                new PriorizacaoTriagemPolicy(),
+                new AdminMetricsService(new io.micrometer.core.instrument.simple.SimpleMeterRegistry())
         );
     }
 
