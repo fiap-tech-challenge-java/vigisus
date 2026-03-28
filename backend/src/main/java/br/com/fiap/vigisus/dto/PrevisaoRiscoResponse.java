@@ -24,6 +24,15 @@ public class PrevisaoRiscoResponse {
     @Schema(description = "Score de risco calculado (0–100)", example = "72")
     private int score;
 
+    @Schema(description = "Sigla da UF do município", example = "SP")
+    private String uf;
+
+    @Schema(description = "Temperatura média atual (°C)", example = "30.5")
+    private Double temperaturaMedia;
+
+    @Schema(description = "Chuva acumulada (mm)", example = "12.3")
+    private Double chuvaAcumulada;
+
     @Schema(description = "Classificação do risco", example = "ALTO")
     private String classificacao;
 
