@@ -39,9 +39,13 @@ O **Vigisus** é uma plataforma pública de vigilância epidemiológica do SUS q
 
 ### Stack Tecnológico
 
-- **Backend**: Java 17 + Spring Boot 3 + Spring Data JPA + PostgreSQL
-- **Frontend**: React 18 + React Router + Recharts
-- **Data Pipeline**: Python 3.11 + requests + ftplib
+- **Backend**: Java 17 + Spring Boot 3.2 + Spring Data JPA + PostgreSQL + Flyway
+- **Cache**: Caffeine (perfil, ranking, risco, clima)
+- **IA**: Google Gemini com fallback determinístico (sem dependência de chave externa)
+- **Frontend**: React 18 + React Router + Tailwind + Chart.js + Leaflet
+- **Data Pipeline**: Python 3.11 + requests + ftplib + pandas
+- **Arquitetura**: DDD + Clean Architecture + SOLID + Ports & Adapters
+- **Testes**: JUnit 5 + Mockito + MockMvc | 91.87% line coverage / 80% branch coverage (JaCoCo)
 - **Infraestrutura**: Docker + Docker Compose
 
 ---
@@ -71,9 +75,17 @@ npm install && npm start
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| GET | `/api/dengue/{municipioId}` | Histórico de dengue por município |
-| GET | `/api/estabelecimentos/{municipioId}` | Estabelecimentos de saúde próximos |
-| GET | `/api/risco-climatico/{municipioId}` | Previsão de risco climático |
+| POST | `/api/busca` | Busca por linguagem natural com IA |
+| GET | `/api/perfil/{coIbge}` | Perfil epidemiológico do município |
+| GET | `/api/previsao-risco/{coIbge}` | Previsão de risco climático municipal |
+| GET | `/api/ranking` | Ranking de municípios por incidência |
+| POST | `/api/triagem/avaliar` | Triagem orientativa de paciente |
+| GET | `/api/encaminhar` | Encaminhamento para hospital com leito disponível |
+| POST | `/api/operacional/pressao` | Análise de pressão operacional |
+| GET | `/api/brasil/dashboard` | Dashboard agregado nacional |
+| GET | `/api/actuator/health` | Health check da API |
+
+Documentação completa: `http://localhost:8080/swagger-ui.html`
 
 ---
 
