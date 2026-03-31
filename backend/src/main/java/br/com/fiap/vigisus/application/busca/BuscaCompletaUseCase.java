@@ -8,6 +8,7 @@ import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.Municipio;
+import br.com.fiap.vigisus.service.AdminMetricsService;
 import br.com.fiap.vigisus.service.EncaminhamentoService;
 import br.com.fiap.vigisus.service.IaService;
 import br.com.fiap.vigisus.service.MunicipioService;
@@ -34,12 +35,15 @@ public class BuscaCompletaUseCase {
     private final PrevisaoRiscoService previsaoRiscoService;
     private final EncaminhamentoService encaminhamentoService;
     private final MunicipioService municipioService;
+    private final AdminMetricsService adminMetricsService;
 
     public BuscaCompletaResponse buscarPorPergunta(String pergunta) {
+        adminMetricsService.registrarBuscaIa(pergunta);
         IntencaoDTO intencao = iaService.interpretarPergunta(pergunta);
         Municipio municipio = encontrarMunicipio(intencao.getMunicipio(), intencao.getUf());
         String coIbge = municipio.getCoIbge();
         intencao.setCoIbge(coIbge);
+        adminMetricsService.registrarBusca(municipio.getNoMunicipio(), municipio.getSgUf());
 
         BuscaCompletaResponse response = buscarPorCoIbge(
                 coIbge,
@@ -55,6 +59,8 @@ public class BuscaCompletaUseCase {
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new MunicipioNotFoundException(municipio.trim() + " / " + uf.trim()));
+
+        adminMetricsService.registrarBusca(municipioEncontrado.getNoMunicipio(), municipioEncontrado.getSgUf());
 
         return buscarPorCoIbge(
                 municipioEncontrado.getCoIbge(),

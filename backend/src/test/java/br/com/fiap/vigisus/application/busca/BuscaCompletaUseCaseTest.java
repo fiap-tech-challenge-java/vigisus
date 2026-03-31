@@ -8,11 +8,13 @@ import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.exception.MunicipioNotFoundException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.Municipio;
+import br.com.fiap.vigisus.service.AdminMetricsService;
 import br.com.fiap.vigisus.service.EncaminhamentoService;
 import br.com.fiap.vigisus.service.IaService;
 import br.com.fiap.vigisus.service.MunicipioService;
 import br.com.fiap.vigisus.service.PerfilEpidemiologicoService;
 import br.com.fiap.vigisus.service.PrevisaoRiscoService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +48,8 @@ class BuscaCompletaUseCaseTest {
                 perfilService,
                 previsaoRiscoService,
                 encaminhamentoService,
-                municipioService
+                municipioService,
+                new AdminMetricsService(new SimpleMeterRegistry())
         );
     }
 

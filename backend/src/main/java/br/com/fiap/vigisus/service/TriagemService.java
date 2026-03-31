@@ -6,6 +6,7 @@ import br.com.fiap.vigisus.dto.EncaminhamentoResponse;
 import br.com.fiap.vigisus.dto.PerfilEpidemiologicoResponse;
 import br.com.fiap.vigisus.dto.TriagemRequest;
 import br.com.fiap.vigisus.dto.TriagemResponse;
+import br.com.fiap.vigisus.service.AdminMetricsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,8 +42,10 @@ public class TriagemService {
     private final IaService iaService;
     private final CalculadoraScoreTriagem calculadoraScoreTriagem;
     private final PriorizacaoTriagemPolicy priorizacaoTriagemPolicy;
+    private final AdminMetricsService adminMetricsService;
 
     public TriagemResponse avaliar(TriagemRequest req) {
+        adminMetricsService.registrarTriagem();
         double score = calcularScore(req);
 
         int anoAtual = Year.now().getValue();
