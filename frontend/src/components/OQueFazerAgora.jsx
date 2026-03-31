@@ -61,7 +61,7 @@ const INSIGHTS = {
 const PERSONAS = [
   {
     key: "medico",
-    icone: "Atendimento",
+    icone: "🩺",
     titulo: "Atendimento",
     fundo: "bg-blue-50",
     tituloCor: "text-blue-800",
@@ -69,7 +69,7 @@ const PERSONAS = [
   },
   {
     key: "gestor",
-    icone: "Gestao",
+    icone: "📋",
     titulo: "Gestao",
     fundo: "bg-orange-50",
     tituloCor: "text-orange-800",
@@ -77,7 +77,7 @@ const PERSONAS = [
   },
   {
     key: "cidadao",
-    icone: "Populacao",
+    icone: "👥",
     titulo: "Populacao",
     fundo: "bg-green-50",
     tituloCor: "text-green-800",
@@ -131,7 +131,7 @@ export default function OQueFazerAgora({ perfil, textoIa, ranking = [], risco = 
               aria-label={`Card de orientacoes para ${persona.titulo}`}
             >
               <p className={`text-sm font-bold mb-2 ${persona.tituloCor}`}>
-                {persona.icone} {persona.titulo}
+                <span aria-hidden="true">{persona.icone}</span> <span className="sr-only">:</span> {persona.titulo}
               </p>
               <ul className="space-y-1.5">
                 {(insights[persona.key] || []).map((item, index) => (
