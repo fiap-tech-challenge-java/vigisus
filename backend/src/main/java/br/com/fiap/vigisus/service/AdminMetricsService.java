@@ -25,7 +25,7 @@ public class AdminMetricsService {
     private final Counter buscasIaCounter;
     private final Counter triagensCounter;
     private final Counter cacheHitsCounter;
-    private final MeterRegistry meterRegistry;
+    private final Counter buscasMunicipioCounter;
 
     private final AtomicLong buscasTotal = new AtomicLong(0);
     private final AtomicLong buscasIa = new AtomicLong(0);
@@ -37,7 +37,6 @@ public class AdminMetricsService {
     private final ConcurrentHashMap<String, AtomicLong> contagemPerguntasIa = new ConcurrentHashMap<>();
 
     public AdminMetricsService(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
         this.buscasTotalCounter = Counter.builder("vigisus.buscas.total")
                 .description("Total de buscas realizadas")
                 .register(meterRegistry);
@@ -50,20 +49,18 @@ public class AdminMetricsService {
         this.cacheHitsCounter = Counter.builder("vigisus.cache.hits")
                 .description("Total de acertos de cache")
                 .register(meterRegistry);
+        this.buscasMunicipioCounter = Counter.builder("vigisus.buscas.municipio")
+                .description("Total de buscas que identificaram um município")
+                .register(meterRegistry);
     }
 
     public void registrarBusca(String municipio, String sgUf) {
         buscasTotalCounter.increment();
         buscasTotal.incrementAndGet();
         if (municipio != null && !municipio.isBlank()) {
+            buscasMunicipioCounter.increment();
             String chave = municipio.trim() + (sgUf != null ? "/" + sgUf.trim().toUpperCase() : "");
             contagemMunicipios.computeIfAbsent(chave, k -> new AtomicLong(0)).incrementAndGet();
-            Counter.builder("vigisus.buscas.municipio")
-                    .description("Buscas por município")
-                    .tag("municipio", municipio.trim())
-                    .tag("uf", sgUf != null ? sgUf.trim().toUpperCase() : "")
-                    .register(meterRegistry)
-                    .increment();
             if (sgUf != null && !sgUf.isBlank()) {
                 contagemEstados.computeIfAbsent(sgUf.trim().toUpperCase(), k -> new AtomicLong(0)).incrementAndGet();
             }

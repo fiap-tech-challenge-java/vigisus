@@ -151,6 +151,8 @@ public class AdminDashboardController {
                 </body>
                 </html>
                 """;
-        return ResponseEntity.ok(html);
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .body(html);
     }
 }
