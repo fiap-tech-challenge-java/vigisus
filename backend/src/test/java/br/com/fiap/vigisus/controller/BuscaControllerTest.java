@@ -4,6 +4,7 @@ import br.com.fiap.vigisus.application.busca.BuscaCompletaUseCase;
 import br.com.fiap.vigisus.dto.BuscaCompletaResponse;
 import br.com.fiap.vigisus.dto.BuscaRequest;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
+import br.com.fiap.vigisus.service.IaBuscaTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,12 +16,14 @@ import static org.mockito.Mockito.when;
 class BuscaControllerTest {
 
     private BuscaCompletaUseCase buscaCompletaUseCase;
+    private IaBuscaTracker iaBuscaTracker;
     private BuscaController controller;
 
     @BeforeEach
     void setUp() {
         buscaCompletaUseCase = mock(BuscaCompletaUseCase.class);
-        controller = new BuscaController(buscaCompletaUseCase);
+        iaBuscaTracker = mock(IaBuscaTracker.class);
+        controller = new BuscaController(buscaCompletaUseCase, iaBuscaTracker);
     }
 
     @Test
