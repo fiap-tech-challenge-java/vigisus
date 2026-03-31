@@ -86,28 +86,30 @@ Fontes publicas (IBGE, DATASUS, Open-Meteo, OpenDataSUS)
 
 ### 4.4 TDD/BDD
 - Backend com ampla suite de testes de:
-  - dominio,
-  - aplicacao (use cases),
-  - controllers,
-  - servicos/config/exceptions.
+  + dominio,
+  + aplicacao (use cases),
+  + controllers,
+  + servicos/config/exceptions.
 - Cobertura observada no JaCoCo:
-  - line coverage: 91.87% (arquivo `backend/target/site/jacoco/jacoco.csv`).
-  - branch coverage: 80% (politicas de dominio cobertas com @ParameterizedTest)
-- `lombok.config` configurado para excluir codigo gerado da analise de cobertura.
+  + line coverage: **91.87%**
+  + branch coverage: **80%** (policies de dominio com @ParameterizedTest cobrindo
+    todos os limiares de classificacao)
+- `lombok.config` configurado para excluir codigo gerado do Lombok da analise.
 
 ## 5. Design Patterns aplicados
 
 | Pattern | Onde aplicado |
 |---------|---------------|
-| Strategy | IaService → GeminiImpl / FallbackImpl |
-| Adapter | CasoDengueJpaAdapter, MunicipioJpaAdapter, RedeAssistencialJpaAdapter |
-| Repository | Spring Data JPA + Ports como contratos de dominio |
-| Factory Method | IaConfig selecionando implementacao de IA por ambiente |
-| Cache-Aside | Caffeine em perfil, ranking, risco e clima |
-| Policy Object | *Policy.java — regras de negocio nomeadas e testaveis |
-| Value Object | CoIbge, IncidenciaPor100kHab, ScoreRisco, NivelPressaoSus |
-| Domain Event | RiscoAltoDetectadoEvent publicado pelo use case de risco |
-| ETL Pipeline | data-pipeline/ com extract → transform → load por dominio |
+| Strategy | `IaService` → `IaServiceGeminiImpl` / `IaServiceFallback` — troca de impl sem alterar use cases |
+| Adapter | `CasoDengueJpaAdapter`, `MunicipioJpaAdapter`, `RedeAssistencialJpaAdapter` — ports→JPA |
+| Repository | Spring Data JPA + Ports como contratos de dominio (DIP) |
+| Factory Method | `IaConfig` selecionando implementacao de IA por variavel de ambiente |
+| Cache-Aside | Caffeine em perfil, ranking, risco e clima — evita round-trips repetidos |
+| Policy Object | `*Policy.java` — regras de negocio nomeadas, testaveis e substituiveis |
+| Value Object | `CoIbge`, `IncidenciaPor100kHab`, `ScoreRisco`, `NivelPressaoSus` — imutaveis |
+| Domain Event | `RiscoAltoDetectadoEvent` — publicado pelo use case quando risco >= ALTO |
+| ETL Pipeline | `data-pipeline/` — extract (FTP/API) → transform → load (PostgreSQL) |
+| Template Method | `clients/requests_config.py` — sessao HTTP padrao com retry/pool/SSL |
 
 ## 6. Decisoes de performance
 - Pipeline:
