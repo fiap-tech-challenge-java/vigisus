@@ -14,9 +14,33 @@ _db_port = os.environ.get("DB_PORT", "5432")
 _db_name = os.environ.get("DB_NAME", "vigisus")
 _db_user = os.environ.get("DB_USER", "vigisus")
 _db_pass = os.environ.get("DB_PASS", "vigisus123")
-DB_URL = os.environ.get(
-    "DB_URL",
-    f"postgresql://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}",
+
+
+def _normalize_db_url(db_url: str) -> str:
+    """Normaliza DB_URL para um formato compatível com SQLAlchemy.
+
+    Aceita também URLs no estilo JDBC (usadas no backend Java), ex.:
+      jdbc:postgresql://localhost:5432/vigisus
+
+    e converte para:
+      postgresql://localhost:5432/vigisus
+    """
+
+    if not db_url:
+        return db_url
+
+    # Aceita o formato JDBC do Postgres (muito comum em projetos fullstack Java)
+    if db_url.startswith("jdbc:postgresql://"):
+        return db_url.replace("jdbc:", "", 1)
+
+    return db_url
+
+
+DB_URL = _normalize_db_url(
+    os.environ.get(
+        "DB_URL",
+        f"postgresql://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}",
+    )
 )
 
 # FTP DATASUS
