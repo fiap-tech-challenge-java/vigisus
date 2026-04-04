@@ -1,0 +1,48 @@
+name: Create v1.0.0 Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/create-release.yml'
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          target_commitish: main
+          name: "VigiSUS v1.0.0 — Hackathon FIAP 2026"
+          body: |
+            ## VigiSUS v1.0.0 — Hackathon FIAP 2026
+
+            MVP entregue para o Hackathon Fase 5 — Arquitetura e Desenvolvimento Java (9ADJT).
+
+            ### O que está incluído
+            - 18 endpoints REST documentados via Swagger (`/swagger-ui.html`)
+            - Pipeline de dados Python com ingestão real de DATASUS (SINAN/CNES via FTP), IBGE e Open-Meteo
+            - Previsão de risco epidemiológico baseada em cruzamento climático (score 0-8, 4 níveis)
+            - Encaminhamento inteligente com fórmula de Haversine (sem APIs de mapas pagas)
+            - Busca por linguagem natural via Gemini com fallback determinístico
+            - Frontend React com dashboards, mapas Leaflet e acessibilidade (WCAG, dark mode, ARIA)
+            - Stack dockerizada: `docker compose up --build` sobe tudo em um comando
+            - Cobertura de testes: 91,87% de linhas (JaCoCo)
+
+            ### Como rodar
+            See [README.md](./README.md) and [docs/COMO_DEMONSTRAR.md](./docs/COMO_DEMONSTRAR.md)
+
+            ### Grupo 7 — FIAP PosTech 9ADJT
+          draft: false
+          prerelease: false
