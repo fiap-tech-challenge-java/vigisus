@@ -3,6 +3,7 @@ package br.com.fiap.vigisus.controller;
 import br.com.fiap.vigisus.application.busca.BuscaCompletaUseCase;
 import br.com.fiap.vigisus.dto.BuscaCompletaResponse;
 import br.com.fiap.vigisus.dto.BuscaRequest;
+import br.com.fiap.vigisus.service.IaBuscaTracker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,12 +25,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class BuscaController {
 
     private final BuscaCompletaUseCase buscaCompletaUseCase;
+    private final IaBuscaTracker iaBuscaTracker;
 
     @PostMapping
     @Operation(
             summary = "Busca por linguagem natural",
             description = "Interpreta a pergunta, consulta a base de dados e retorna resposta narrativa gerada por IA")
     public BuscaCompletaResponse buscar(@Valid @RequestBody BuscaRequest request) {
+        iaBuscaTracker.registrar(request.getPergunta());
         return buscaCompletaUseCase.buscarPorPergunta(request.getPergunta());
     }
 
