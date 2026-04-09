@@ -13,6 +13,7 @@ import br.com.fiap.vigisus.service.IaService;
 import br.com.fiap.vigisus.service.MunicipioService;
 import br.com.fiap.vigisus.service.PerfilEpidemiologicoService;
 import br.com.fiap.vigisus.service.PrevisaoRiscoService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class BuscaCompletaUseCase {
     private final PrevisaoRiscoService previsaoRiscoService;
     private final EncaminhamentoService encaminhamentoService;
     private final MunicipioService municipioService;
+    private final MeterRegistry meterRegistry;
 
     public BuscaCompletaResponse buscarPorPergunta(String pergunta) {
         IntencaoDTO intencao = iaService.interpretarPergunta(pergunta);
@@ -47,6 +49,11 @@ public class BuscaCompletaUseCase {
                 resolverAno(intencao.getAno())
         );
         response.setInterpretacao(intencao);
+
+        meterRegistry.counter("vigisus.buscas.linguagem_natural",
+                "query_tipo", "linguagem_natural"
+        ).increment();
+
         return response;
     }
 

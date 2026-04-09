@@ -4,6 +4,7 @@ import br.com.fiap.vigisus.domain.risco.RiscoAltoDetectadoEvent;
 import br.com.fiap.vigisus.dto.PrevisaoRiscoResponse;
 import br.com.fiap.vigisus.service.IaService;
 import br.com.fiap.vigisus.service.PrevisaoRiscoService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -20,7 +21,7 @@ class ConsultarPrevisaoRiscoUseCaseTest {
     private final IaService iaService = mock(IaService.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final ConsultarPrevisaoRiscoUseCase useCase =
-        new ConsultarPrevisaoRiscoUseCase(previsaoRiscoService, iaService, eventPublisher);
+        new ConsultarPrevisaoRiscoUseCase(previsaoRiscoService, iaService, eventPublisher, new SimpleMeterRegistry());
 
     @Test
     void buscarPorMunicipio_aplicaTextoIa() {

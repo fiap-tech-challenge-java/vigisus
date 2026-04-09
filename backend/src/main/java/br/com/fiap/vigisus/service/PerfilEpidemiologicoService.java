@@ -9,6 +9,7 @@ import br.com.fiap.vigisus.dto.SemanaDTO;
 import br.com.fiap.vigisus.exception.DadosInsuficientesException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.Municipio;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class PerfilEpidemiologicoService {
     private final RankingService rankingService;
     private final ClassificacaoEpidemiologicaPolicy classificacaoEpidemiologicaPolicy;
     private final CalculadoraTendenciaEpidemiologica calculadoraTendenciaEpidemiologica;
+    private final MeterRegistry meterRegistry;
 
     @Cacheable(value = "perfil-epidemiologico", key = "#coIbge + '-' + #doenca + '-' + #ano")
     public PerfilEpidemiologicoResponse gerarPerfil(String coIbge, String doenca, int ano) {
@@ -78,7 +80,7 @@ public class PerfilEpidemiologicoService {
                 ? posicao + " municípios em " + municipio.getSgUf()
                 : null;
 
-        return PerfilEpidemiologicoResponse.builder()
+        PerfilEpidemiologicoResponse response = PerfilEpidemiologicoResponse.builder()
                 .coIbge(coIbge)
                 .municipio(municipio.getNoMunicipio())
                 .uf(municipio.getSgUf())
@@ -96,6 +98,14 @@ public class PerfilEpidemiologicoService {
                 .nuLatitude(municipio.getNuLatitude())
                 .nuLongitude(municipio.getNuLongitude())
                 .build();
+
+        meterRegistry.counter("vigisus.buscas.municipio",
+                "coIbge", coIbge,
+                "municipio", response.getMunicipio(),
+                "uf", response.getUf()
+        ).increment();
+
+        return response;
     }
 
     private List<SemanaDTO> buscarAnoAnterior(String coMunicipio, int ano) {

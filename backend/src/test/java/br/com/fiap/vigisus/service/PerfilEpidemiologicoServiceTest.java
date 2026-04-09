@@ -8,6 +8,7 @@ import br.com.fiap.vigisus.exception.DadosInsuficientesException;
 import br.com.fiap.vigisus.exception.RecursoNaoEncontradoException;
 import br.com.fiap.vigisus.model.CasoDengue;
 import br.com.fiap.vigisus.model.Municipio;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +51,8 @@ class PerfilEpidemiologicoServiceTest {
                 casoDenguePort,
                 rankingService,
                 new ClassificacaoEpidemiologicaPolicy(),
-                new CalculadoraTendenciaEpidemiologica()
+                new CalculadoraTendenciaEpidemiologica(),
+                new SimpleMeterRegistry()
         );
         lenient().when(rankingService.calcularPosicaoNoEstado(anyString(), anyString(), anyString(), anyInt()))
                 .thenReturn("1 de 10");

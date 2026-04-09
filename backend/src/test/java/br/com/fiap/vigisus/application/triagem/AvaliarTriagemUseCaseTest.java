@@ -3,6 +3,7 @@ package br.com.fiap.vigisus.application.triagem;
 import br.com.fiap.vigisus.dto.TriagemRequest;
 import br.com.fiap.vigisus.dto.TriagemResponse;
 import br.com.fiap.vigisus.service.TriagemService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,7 +17,7 @@ class AvaliarTriagemUseCaseTest {
     @Test
     void executar_delegaAoService() {
         TriagemService triagemService = mock(TriagemService.class);
-        AvaliarTriagemUseCase useCase = new AvaliarTriagemUseCase(triagemService);
+        AvaliarTriagemUseCase useCase = new AvaliarTriagemUseCase(triagemService, new SimpleMeterRegistry());
         TriagemRequest request = TriagemRequest.builder()
                 .municipio("3131307")
                 .sintomas(List.of("febre"))
